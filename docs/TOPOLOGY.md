@@ -7,6 +7,7 @@ It answers five questions: how the schematic should grow (fixed slots or an inte
 ## Principles
 
 - **No user-facing topology language.** A freely composable graph in the configuration would make every dashboard a hydraulic design task. The configuration stays semantic (`storage: combined`, stove entities, boiler entities); how the card draws it is internal.
+- **Fixed slots, the same for every installation.** A part keeps its place on every installation; a request to move or resize a part for one installation is declined (`by design`), a layout bug is fixed within its slot, and a new variant is weighed by how common it is ([scope of the drawing](../CONTRIBUTING.md#scope-of-the-drawing)).
 - **Existing configurations do not change.** Every variant is off by default and selected by an explicit option or by entities that only exist on such installations.
 - **Reuse entity keys where the meaning holds.** Presets, the editor and the diagnostic report keep working without a parallel set of keys.
 - **No guessed preset semantics.** A generic feature may ship with explicit, card-defined manual entities and conservative defaults. Integration-specific automatic mappings still require a reviewed diagnostic report from a real installation.

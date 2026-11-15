@@ -6,6 +6,8 @@ body:
     attributes:
       value: |
         Thanks for reporting! Please fill in as much as you can. If your card version shows a document button in the header, copy its diagnostic report, review entity ids for private names, and paste it below. The report stays local until you paste it.
+
+        A question about settings or configuration goes to the [Q&A discussions](https://github.com/Sturmi77/heatpump-hydraulic-card/discussions/categories/q-a); the [FAQ](https://github.com/Sturmi77/heatpump-hydraulic-card/blob/main/docs/FAQ.md) answers the common ones. The drawing uses fixed slots, the same for every installation: a covered or cut-off text is a bug, a wish to move a part for one installation is not ([scope of the drawing](https://github.com/Sturmi77/heatpump-hydraulic-card/blob/main/CONTRIBUTING.md#scope-of-the-drawing)).
   - type: input
     id: version
     attributes:
@@ -39,6 +41,7 @@ body:
         - luxtronik
         - stiebel_isg
         - samsung
+        - espaltherma
         - none (manual entities)
     validations:
       required: true

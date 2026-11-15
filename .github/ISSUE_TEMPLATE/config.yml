@@ -1,5 +1,11 @@
-blank_issues_enabled: true
+blank_issues_enabled: false
 contact_links:
+  - name: Question about settings or configuration
+    url: https://github.com/Sturmi77/heatpump-hydraulic-card/discussions/categories/q-a
+    about: Ask in the Q&A discussions; the answer stays with the question. Common questions are answered in the FAQ (docs/FAQ.md).
+  - name: Frequently asked questions
+    url: https://github.com/Sturmi77/heatpump-hydraulic-card/blob/main/docs/FAQ.md
+    about: Moving parts of the drawing, valves without an entity, empty stat tiles, quick controls and more.
   - name: Home Assistant Community thread
     url: https://community.home-assistant.io/t/card-heatpump-flow-card-animated-hydraulic-schematic-for-heat-pumps-lambda-viessmann-vaillant-bosch-buderus-panasonic/1029598
-    about: Questions, ideas and showing off your setup.
+    about: Showing your setup, ideas and general talk.

@@ -91,6 +91,18 @@ Languages are built into the card and may be partial. [docs/TRANSLATING.md](docs
 
 The recommended required checks for the default branch are `HACS validation`, `Quality`, `Browser / chromium` and `Browser / firefox`.
 
+## Scope of the drawing
+
+The schematic is drawn from fixed slots: every part (heat pump, boiler, valve, tanks, circuits) has one place, the same on every installation, and the layout is tested for all of them in every language and width ([topology plan](docs/TOPOLOGY.md)). It shows what role a part plays in the water circuit, not where it stands in the boiler room. Requests about the drawing fall into three groups:
+
+| Request | Example | What happens |
+|---|---|---|
+| Layout bug | a text covered or cut off, a pipe that flows the wrong way, a wrong state | Fixed within the slot, with the field case of the report ([topology test](#topology-test-and-drawing-snapshot)). |
+| New hydraulic variant | a fresh-water station on a dedicated hot-water buffer | Added to the catalog of variants and weighed by how common it is, not built for one installation. A sketch and the diagnostic report help. |
+| Look for one installation | move the boiler, swap two parts, change the spacing | Declined and labelled `by design`. The card offers colours (`--hfc-*`), layouts, names and which values are shown instead. |
+
+Questions about settings and configuration belong in the [Q&A discussions](https://github.com/Sturmi77/heatpump-hydraulic-card/discussions/categories/q-a); the [FAQ](docs/FAQ.md) answers the common ones.
+
 ## Issue and release lifecycle
 
 - Bugs take priority over enhancements. Reproduce them first and add a regression test with the fix.

@@ -4515,10 +4515,70 @@
     card = mount({ preset: 'heishamon', entities: { hc_pump: 'binary_sensor.z1_pump' } }, hassOf({ ...st(), 'binary_sensor.z1_pump': { state: 'on', attributes: {} } })); await wait(20);
     check(q(card, '#impeller-primary') && q(card, 'circle.pump[cx="720"]'), 'a circuit pump sensor keeps the circuit pump next to the primary pump');
     card.remove();
+    // #416: the primary pump's own state wins over the flow rate. A circuit pump can push water through the heat pump's loop
+    // through a tee while the primary pump stands, so the flow sensor reads a few l/min with the pump off.
+    const pumpSt = (state, extra = {}) => ({ ...st({ [`sensor.${p}_main_pump_flow`]: ['5', 'l/min'], [`sensor.${p}_main_compressor_freq`]: ['0', 'Hz'], ...extra }),
+      'binary_sensor.primary_pump': { entity_id: 'binary_sensor.primary_pump', state, attributes: {} } });
+    card = mount({ preset: 'heishamon', entities: { primary_pump_state: 'binary_sensor.primary_pump' } }, hassOf(pumpSt('off'))); await wait(20);
+    check(!q(card, '#impeller-primary').classList.contains('on') && !q(card, '#p-vl').classList.contains('on'),
+      '#416: with the primary pump state off the pump stands and the water does not circulate, although the flow rate reads 5 l/min');
+    check(q(card, '#t-vol').textContent === '300 l/h', `#416: the flow rate stays visible with the pump off (${q(card, '#t-vol').textContent})`);
+    card.hass = hassOf(pumpSt('on')); await wait(5);
+    check(q(card, '#impeller-primary').classList.contains('on') && q(card, '#p-vl').classList.contains('on'), '#416: with the state on the primary pump turns and the water circulates');
+    card.hass = hassOf(pumpSt('on', { [`sensor.${p}_main_pump_flow`]: ['0', 'l/min'] })); await wait(5);
+    check(q(card, '#impeller-primary').classList.contains('on'), '#416: the state on turns the pump also while the flow rate reads 0');
+    card.hass = hassOf(pumpSt('unavailable')); await wait(5);
+    check(q(card, '#impeller-primary').classList.contains('on'), '#416: an unavailable pump state falls back to the flow rate');
+    card.hass = hassOf(pumpSt('off', { [`sensor.${p}_main_compressor_freq`]: ['19', 'Hz'] })); await wait(5);
+    check(!q(card, '#impeller-primary').classList.contains('on') && q(card, '#p-vl').classList.contains('on'),
+      '#416: while the heat pump runs the reported state still decides the impeller; the loop keeps flowing');
+    card.remove();
+    check(C._formSchema({}).schema.flatMap(function keysOf(n) { return n.schema ? n.schema.flatMap(keysOf) : [n.name]; }).includes('primary_pump_state'), '#416: editor offers the primary pump state');
     card = mount({ ...setups[0].config }, hassOf(toStates(setups[0].states('heat')), setups[0].registry || {}, setups[0].energy, setups[0])); await wait(20);
     check(!q(card, '#impeller-primary'), 'presets without primary_pump keep the circuit pump only');
     card.remove();
     check(C._formSchema({}).schema.flatMap(function keysOf(n) { return n.schema ? n.schema.flatMap(keysOf) : [n.name]; }).includes('primary_pump'), 'editor offers the primary pump in the heat pump');
+  }
+
+  // 18l2. #415: each heating circuit follows its own flow rate, not the heat pump's. Behind a parallel buffer a circuit without
+  // a flow rate moves at a neutral speed; without a buffer it is the heat pump's water loop and keeps its speed. Risers and the
+  // trunk carry the sum of the flowing circuits below them.
+  {
+    const st = (extra = {}) => toStates({
+      'sensor.flow': ['40', '°C'], 'sensor.ret': ['34', '°C'], 'binary_sensor.comp': 'on', 'sensor.vol': ['300', 'l/h'],
+      'sensor.buf': ['38', '°C'], 'binary_sensor.hc1': 'on', 'binary_sensor.hc2': 'on', 'sensor.hc1v': ['16.4', 'l/min'], 'sensor.hc2v': ['500', 'l/h'], ...extra,
+    });
+    const base = { flow: 'sensor.flow', return: 'sensor.ret', compressor: 'binary_sensor.comp', volume: 'sensor.vol', hc_pump: 'binary_sensor.hc1', hc2_pump: 'binary_sensor.hc2' };
+    const cfg = (entities, more = {}) => ({ hc_count: 2, entities: { ...base, ...entities }, ...more });
+    const P = (card, id) => card._speedDurs.paths[`f-${id}`];
+    let card = mount(cfg({ buffer_top: 'sensor.buf', hc_volume: 'sensor.hc1v', hc2_volume: 'sensor.hc2v' }), hassOf(st())); await wait(20);
+    const near = (a, b) => Math.abs(a - b) < 0.01;
+    check(near(card._speedDurs.flow, 1000 / 300), `#415: the heat pump loop follows volume (${card._speedDurs.flow.toFixed(2)}s)`);
+    check(near(P(card, 'hc-vl'), 1000 / 984) && near(P(card, 'hc-body'), P(card, 'hc-vl')) && near(P(card, 'hc-rl'), P(card, 'hc-vl')),
+      `#415: circuit 1 follows hc_volume (16.4 l/min = 984 l/h: ${P(card, 'hc-vl')?.toFixed(2)}s)`);
+    check(near(P(card, 'hc-vl2'), 1000 / 500), `#415: circuit 2 follows hc2_volume (${P(card, 'hc-vl2')?.toFixed(2)}s)`);
+    check(near(P(card, 'hc-up2'), 1000 / 500) && near(P(card, 'hc-trunk-vl'), 1000 / 1484), `#415: the riser to circuit 2 carries circuit 2, the trunk both circuits (${P(card, 'hc-up2')?.toFixed(2)}s, ${P(card, 'hc-trunk-vl')?.toFixed(2)}s)`);
+    const hc1 = P(card, 'hc-vl');
+    card.hass = hassOf(st({ 'sensor.vol': ['900', 'l/h'] })); await wait(5);
+    check(near(card._speedDurs.flow, 1000 / 900) && near(P(card, 'hc-vl'), hc1), '#415: a changed heat pump flow rate leaves the circuit speed alone');
+    card.hass = hassOf(st({ 'sensor.hc1v': ['8.2', 'l/min'] })); await wait(5);
+    check(near(card._speedDurs.flow, 1000 / 300) && near(P(card, 'hc-vl'), 2 * hc1), '#415: a changed circuit flow rate leaves the heat pump loop alone');
+    const el = q => card.shadowRoot.querySelector(q);
+    // The rate the card asked for: updatePlaybackRate applies it with the next frame, which a hidden test page may not draw.
+    const rate = el('#f-hc-vl')?.getAnimations?.()[0]?._hfcRate;
+    check(rate === undefined || near(rate, 1 / P(card, 'hc-vl')), `#415: the circuit's dashes get its own playback rate (${rate})`);
+    card.hass = hassOf(st({ 'binary_sensor.hc2': 'off' })); await wait(5);
+    check(near(P(card, 'hc-trunk-vl'), 1000 / 984), `#415: the trunk carries only the flowing circuits (${P(card, 'hc-trunk-vl')?.toFixed(2)}s)`);
+    card.remove();
+    card = mount(cfg({ buffer_top: 'sensor.buf' }, { flow_speed: 2 }), hassOf(st())); await wait(20);
+    check(near(P(card, 'hc-vl'), 1) && near(P(card, 'hc-vl2'), 1), `#415: behind a buffer a circuit without a flow rate moves at the neutral speed, times flow_speed (${P(card, 'hc-vl')?.toFixed(2)}s)`);
+    card.remove();
+    card = mount(cfg({}, { hc_count: 1 }), hassOf(st())); await wait(20);
+    check(near(P(card, 'hc-vl'), card._speedDurs.flow), `#415: without a buffer the circuit is the heat pump's loop and keeps its speed (${P(card, 'hc-vl')?.toFixed(2)}s)`);
+    card.remove();
+    card = mount(cfg({ hc_volume: 'sensor.hc1v' }, { hc_count: 1 }), hassOf(st())); await wait(20);
+    check(near(P(card, 'hc-vl'), 1000 / 984), '#415: without a buffer a circuit flow rate still wins for the circuit');
+    card.remove();
   }
 
   // 18o. primary pump of the Samsung and Kronoterm presets: the pump of the heat pump stands on the flow pipe

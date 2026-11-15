@@ -1782,7 +1782,7 @@ const HFC_EDITOR = {
     hc_pressure_min: 'Heating pressure warning below', hc_pressure_crit: 'Heating pressure critical below', hc_pressure_max: 'Heating pressure warning above',
     sec_hp: 'Heat pump', sec_boiler: 'Boiler / second heat generator', sec_storage: 'Storage', sec_hc: 'Heating circuit & house', sec_power: 'Power sources', sec_stats: 'Statistics',
     mode: 'Operating mode (state text)', status: 'Status / sub-state (text)', compressor: 'Compressor running (on/off, or frequency / speed above 0)', defrost: 'Defrost active (on/off)', fan_speed: 'Fan speed (rpm, or on/off)', power: 'Electrical power of the heat pump (W or kW)',
-    heat: 'Heat output (kW or W)', flow: 'Heat pump flow temperature (°C)', return: 'Heat pump return temperature (°C)', volume: 'Flow rate of the heat pump loop (l/h or l/min, primary pump)',
+    heat: 'Heat output (kW or W)', flow: 'Heat pump flow temperature (°C)', return: 'Heat pump return temperature (°C)', volume: 'Flow rate of the heat pump loop (l/h or l/min, primary pump)', primary_pump_state: 'Primary pump running (on/off; default: from the flow rate)',
     boiler_state: 'Boiler running (on/off, or a power above 0)', boiler_power: 'Boiler output (W or kW)', boiler_flow: 'Boiler flow temperature (°C)',
     source_volume: 'Flow rate of the brine or well loop (l/h or l/min, not for air)', source_in: 'Source inlet temperature (°C: air, brine or well water in)', outdoor: 'Outdoor temperature (°C)',
     valve: 'Diverter valve towards hot water (on/off, or a state like Tank/Room)', bypass_valve: 'Series buffer bypass valve (on = bypass; default: defrost)',
@@ -1875,7 +1875,7 @@ const HFC_EDITOR = {
     hc_pressure_min: 'Heizungsdruck Warnung unter', hc_pressure_crit: 'Heizungsdruck kritisch unter', hc_pressure_max: 'Heizungsdruck Warnung über',
     sec_hp: 'Wärmepumpe', sec_boiler: 'Heizkessel / zweiter Wärmeerzeuger', sec_storage: 'Speicher', sec_hc: 'Heizkreis & Haus', sec_power: 'Stromquellen', sec_stats: 'Kennzahlen',
     mode: 'Betriebsart (Statustext)', status: 'Status / Unterzustand (Text)', compressor: 'Verdichter läuft (ein/aus, oder Frequenz / Drehzahl über 0)', defrost: 'Abtauen aktiv (ein/aus)', fan_speed: 'Lüfterdrehzahl (U/min, oder ein/aus)', power: 'Elektrische Leistungsaufnahme der Wärmepumpe (W oder kW)',
-    heat: 'Wärmeleistung (kW oder W)', flow: 'Vorlauftemperatur der Wärmepumpe (°C)', return: 'Rücklauftemperatur der Wärmepumpe (°C)', volume: 'Volumenstrom Wärmepumpenkreis (l/h oder l/min, Primärpumpe)',
+    heat: 'Wärmeleistung (kW oder W)', flow: 'Vorlauftemperatur der Wärmepumpe (°C)', return: 'Rücklauftemperatur der Wärmepumpe (°C)', volume: 'Volumenstrom Wärmepumpenkreis (l/h oder l/min, Primärpumpe)', primary_pump_state: 'Primärpumpe läuft (ein/aus; Standard: aus dem Volumenstrom)',
     boiler_state: 'Heizkessel läuft (ein/aus, oder Leistung über 0)', boiler_power: 'Kesselleistung (W oder kW)', boiler_flow: 'Kessel-Vorlauftemperatur (°C)',
     source_volume: 'Volumenstrom Sole- oder Brunnenkreis (l/h oder l/min, nicht bei Luft)', source_in: 'Quelle Eintritt (°C: Luft, Sole oder Brunnenwasser rein)', outdoor: 'Außentemperatur (°C)',
     valve: 'Umschaltventil auf Warmwasser (ein/aus, oder Zustand wie Tank/Room)', bypass_valve: 'Bypass-Ventil Reihenpuffer (ein = Bypass; Standard: Abtauen)',
@@ -1953,7 +1953,7 @@ const HFC_EDITOR = {
     hc_pressure_min: 'Ostrzeżenie o niskim ciśnieniu ogrzewania poniżej', hc_pressure_crit: 'Krytyczne niskie ciśnienie ogrzewania poniżej', hc_pressure_max: 'Ostrzeżenie o wysokim ciśnieniu ogrzewania powyżej',
     sec_hp: 'Pompa ciepła', sec_storage: 'Magazyn energii', sec_hc: 'Obieg grzewczy i dom', sec_power: 'Źródła zasilania', sec_stats: 'Statystyki',
     mode: 'Tryb pracy', status: 'Status / podstan', compressor: 'Sprężarka działa (binarna lub częstotliwość)', defrost: 'Odszranianie aktywne (binarne)', fan_speed: 'Prędkość wentylatora (obr./min lub binarna)', power: 'Moc elektryczna',
-    heat: 'Moc grzewcza', flow: 'Temperatura na zasilaniu', return: 'Temperatura na powrocie', volume: 'Przepływ po stronie grzewczej',
+    heat: 'Moc grzewcza', flow: 'Temperatura na zasilaniu', return: 'Temperatura na powrocie', volume: 'Przepływ po stronie grzewczej', primary_pump_state: 'Pompa pierwotna działa (binarna; domyślnie: z przepływu)',
     source_volume: 'Przepływ po stronie źródła', source_in: 'Temperatura źródła / wlotu powietrza', outdoor: 'Temperatura zewnętrzna',
     valve: 'Zawór przełączający c.w.u. (binarny lub Zbiornik/Pomieszczenie)', bypass_valve: 'Zawór bocznikowy bufora szeregowego (włączony = obejście; domyślnie: odszranianie)',
     pv_boost: 'Tryb nadwyżki PV (włączony, lub moc powyżej 0)',
@@ -2083,7 +2083,7 @@ const HFC_EDITOR = {
     hc_pressure_min: 'Varovanie: nízky tlak vykurovania pod', hc_pressure_crit: 'Kritický nízky tlak vykurovania pod', hc_pressure_max: 'Varovanie: vysoký tlak vykurovania nad',
     sec_hp: 'Tepelné čerpadlo', sec_storage: 'Zásobník', sec_hc: 'Vykurovací okruh a dom', sec_power: 'Zdroje energie', sec_stats: 'Štatistiky',
     mode: 'Prevádzkový režim', status: 'Stav / podstav', compressor: 'Kompresor beží (binárne alebo frekvencia)', defrost: 'Odmrazovanie aktívne (binárne)', fan_speed: 'Rýchlosť ventilátora (ot/min alebo binárne)', power: 'Elektrický výkon',
-    heat: 'Tepelný výkon', flow: 'Teplota na prívode', return: 'Teplota na spiatočke', volume: 'Prietok na strane vykurovania',
+    heat: 'Tepelný výkon', flow: 'Teplota na prívode', return: 'Teplota na spiatočke', volume: 'Prietok na strane vykurovania', primary_pump_state: 'Primárne čerpadlo beží (binárne; predvolené: z prietoku)',
     source_volume: 'Prietok na strane zdroja', source_in: 'Teplota zdroja / prívodu vzduchu', outdoor: 'Vonkajšia teplota',
     valve: 'Prepínací ventil na TÚV (binárne alebo Nádrž/Miestnosť)', bypass_valve: 'Obtokový ventil sériového akumulačného zásobníka (zapnuté = obtok; predvolené: odmrazovanie)',
     pv_boost: 'Režim prebytku FVE (zapnuté, alebo výkon nad 0)',
@@ -2213,7 +2213,7 @@ const HFC_EDITOR = {
     hc_pressure_min: 'Varování: nízký tlak vytápění pod', hc_pressure_crit: 'Kritický nízký tlak vytápění pod', hc_pressure_max: 'Varování: vysoký tlak vytápění nad',
     sec_hp: 'Tepelné čerpadlo', sec_storage: 'Zásobník', sec_hc: 'Topný okruh a dům', sec_power: 'Zdroje energie', sec_stats: 'Statistiky',
     mode: 'Provozní režim', status: 'Stav / podstav', compressor: 'Kompresor běží (binární nebo frekvence)', defrost: 'Odmrazování aktivní (binární)', fan_speed: 'Rychlost ventilátoru (ot/min nebo binární)', power: 'Elektrický výkon',
-    heat: 'Tepelný výkon', flow: 'Teplota na přívodu', return: 'Teplota na zpátečce', volume: 'Průtok na straně vytápění',
+    heat: 'Tepelný výkon', flow: 'Teplota na přívodu', return: 'Teplota na zpátečce', volume: 'Průtok na straně vytápění', primary_pump_state: 'Primární čerpadlo běží (binární; výchozí: z průtoku)',
     source_volume: 'Průtok na strane zdroje', source_in: 'Teplota zdroje / přívodu vzduchu', outdoor: 'Venkovní teplota',
     valve: 'Přepínací ventil na TUV (binární nebo Nádrž/Místnost)', bypass_valve: 'Obtokový ventil sériového akumulačního zásobníku (zapnuto = obtok; výchozí: odmrazování)',
     pv_boost: 'Režim přebytku FVE (zapnuto, nebo výkon nad 0)',
@@ -2353,7 +2353,7 @@ const HFC_EDITOR = {
     hc_pressure_min: 'Verwarmingsdruk waarschuwing onder', hc_pressure_crit: 'Verwarmingsdruk kritiek onder', hc_pressure_max: 'Verwarmingsdruk waarschuwing boven',
     sec_hp: 'Warmtepomp', sec_storage: 'Opslag', sec_hc: 'Verwarmingsgroep & woning', sec_power: 'Stroombronnen', sec_stats: 'Statistieken',
     mode: 'Bedrijfsstand (statustekst)', status: 'Status / substatus (tekst)', compressor: 'Compressor actief (aan/uit, of frequentie / toerental boven 0)', defrost: 'Ontdooien actief (aan/uit)', fan_speed: 'Ventilatortoerental (rpm, of aan/uit)', power: 'Elektrisch vermogen van de warmtepomp (W of kW)',
-    heat: 'Warmtevermogen (kW of W)', flow: 'Aanvoertemperatuur warmtepomp (°C)', return: 'Retourtemperatuur warmtepomp (°C)', volume: 'Debiet van het warmtepompcircuit (l/h of l/min, primaire pomp)',
+    heat: 'Warmtevermogen (kW of W)', flow: 'Aanvoertemperatuur warmtepomp (°C)', return: 'Retourtemperatuur warmtepomp (°C)', volume: 'Debiet van het warmtepompcircuit (l/h of l/min, primaire pomp)', primary_pump_state: 'Primaire pomp actief (aan/uit; standaard: uit het debiet)',
     source_volume: 'Debiet van het bron- of putcircuit (l/h of l/min, niet voor lucht)', source_in: 'Inlaattemperatuur bron (°C: lucht, brine of putwater in)', outdoor: 'Buitentemperatuur (°C)',
     valve: 'Driewegklep naar warm water (aan/uit, of een stand zoals Tank/Room)', bypass_valve: 'Bypassklep seriebuffer (aan = bypass; standaard: ontdooien)',
     pv_boost: 'PV-overschotstand (aan, of een vermogen boven 0)',
@@ -2409,7 +2409,7 @@ const hfcMeanKey = (key) => /^(hc[2-6]_)?room(_humidity)?$/.test(key);
 const hfcCompressorOn = (s) => ['on', 'true', 'open', 'ein'].includes(String(s ?? '').trim().toLowerCase()) || parseFloat(s) > 0;
 
 const HFC_ENTITY_GROUPS = {
-  sec_hp: ['mode', 'status', 'compressor', 'fan_speed', 'defrost', 'power', 'heat', 'flow', 'return', 'volume', 'source_volume', 'source_in', 'source_out', 'brine_pressure', 'outdoor', 'valve', 'heater', 'pv_boost', 'sg_ready'],
+  sec_hp: ['mode', 'status', 'compressor', 'fan_speed', 'defrost', 'power', 'heat', 'flow', 'return', 'volume', 'primary_pump_state', 'source_volume', 'source_in', 'source_out', 'brine_pressure', 'outdoor', 'valve', 'heater', 'pv_boost', 'sg_ready'],
   sec_boiler: ['boiler_state', 'boiler_power', 'boiler_flow'],
   sec_storage: ['dhw_top', 'dhw_middle', 'dhw_bottom', 'dhw_target', 'dhw_mode', 'circulation', 'circulation_start', 'circulation_end', 'circulation_schedule', 'dhw_loss_sensor', 'dhw_heater', 'dhw_heater_top', 'dhw_heater_middle', 'dhw_heater_bottom', 'buffer_top', 'buffer_middle', 'buffer_bottom', 'buffer_mode', 'buffer_heater', 'buffer_heater_top', 'buffer_heater_middle', 'buffer_heater_bottom', 'bypass_valve', 'solar_collector', 'solar_pump'],
   sec_hc: ['hc_flow', 'hc_return', 'hc_setpoint', 'hc_mode', 'hc_pump', 'hc_volume', 'hc_curve_offset', 'hc_mixer', 'hc_mixer_opening', 'hc_mixer_closing', 'hc_pressure', 'room', 'room_target', 'room_humidity', 'dew_point', 'program'],
@@ -2477,7 +2477,7 @@ const HFC_KEY_KINDS = Object.fromEntries(Object.entries({
   counter: ['starts_total', 'starts_today', 'cutout_high_pressure', 'cutout_low_pressure', 'cutout_temperature'],
   ratio: ['cop_heating_today', 'cop_dhw_today'],
   speed: ['compressor', 'fan_speed', 'compressor_speed'],
-  onoff: ['defrost', 'circulation', 'hc_pump', 'hc_mixer_opening', 'hc_mixer_closing', 'solar_pump', 'bypass_valve'],
+  onoff: ['defrost', 'circulation', 'hc_pump', 'primary_pump_state', 'hc_mixer_opening', 'hc_mixer_closing', 'solar_pump', 'bypass_valve'],
   onoff_power: ['heater', 'boiler_state', ...HFC_TANK_HEATERS, 'pv_boost'],
   valve: ['valve'],
   text: ['mode', 'status', 'dhw_mode', 'buffer_mode', 'hc_mode', 'program', 'sg_ready'],
@@ -6641,7 +6641,11 @@ class HeatpumpFlowCard extends HTMLElement {
     // slowly along the valve path (flow dashes 2000 / l/h seconds, 6 to 30 s). It only moves the water, so mode chip, valve text, spread and heat stay idle.
     // A shared pump (#344) reports its own state, which stands in for a missing flow rate.
     const sharedPump = this._primaryPump() && this._sharedPump();
-    const primaryRuns = Number.isFinite(vol) ? vol > 0 : sharedPump ? this._pumpOn('hc_pump') : null;
+    // The primary pump's own state wins (#416): water can move through the heat pump while its pump stands, driven by a circuit
+    // pump through a tee, so a flow rate above 0 does not prove the pump runs. Unavailable or unknown falls back to the flow rate.
+    const pumpKnown = this._has('primary_pump_state') && !['unavailable', 'unknown'].includes(String(this._s('primary_pump_state')).toLowerCase());
+    const primaryRuns = pumpKnown ? this._pumpOn('primary_pump_state')
+      : Number.isFinite(vol) ? vol > 0 : sharedPump ? this._pumpOn('hc_pump') : null;
     const circ = this._primaryPump() && !loop && primaryRuns === true;
     const flowDhw = toDhw || (circ && valveDhw && !!P.dhw);
     const flowHeat = toHeat || (circ && !flowDhw);
@@ -6702,6 +6706,8 @@ class HeatpumpFlowCard extends HTMLElement {
       toDhw, toHeat, loop, circ, flowDhw, flowHeat, flowLoop, bypass, heatLoop,
       // The heat pump's own primary pump runs with a flow rate, else with the hot-water or heating loop.
       primaryPump: primaryRuns ?? loop,
+      // The pump reports off while the flow sensor still reads water moving through the loop (#416): the value stays visible.
+      passiveFlow: pumpKnown && !primaryRuns && vol > 0,
       // The DHW coil heats while the valve charges the tank.
       coil: toDhw,
       solar, circuits, pipes,
@@ -6754,8 +6760,29 @@ class HeatpumpFlowCard extends HTMLElement {
       : (modOk ? 2.4 - mod * 1.9 : Math.min(Math.max(2.4 - (power || 0) / 1500, 0.5), 2.4));
     const pumpDur = modOk ? 1.8 - mod * 1.2 : 1.2;
     // Flow dashes, fans and pumps change their speed with every new sensor value: they get it as a playback rate (_speeds).
+    // Each heating circuit follows its own flow rate (#415): hc_volume / hcN_volume. Without one, a circuit behind a parallel
+    // buffer moves at a neutral speed, as its water is not the heat pump's; without a parallel buffer it is the same water loop,
+    // so it keeps the heat pump's speed. Risers and the trunk carry the circuits below them: the sum of their flow rates.
+    const byFlow = (v) => Math.min(Math.max(1000 / v, 0.4), 30);
+    const hcVol = (n) => { const v = this._lh(this._hk(n, 'volume')); return Number.isFinite(v) && v > 0 ? v : NaN; };
+    const ownLoop = !!this._parts.buffer;
+    const groupDur = (list) => {
+      const flowing = list.filter((c) => c.on);
+      const vols = flowing.map((c) => hcVol(c.n));
+      if (flowing.length && vols.every(Number.isFinite)) return byFlow(vols.reduce((a, v) => a + v, 0));
+      return ownLoop ? 2 : dur;
+    };
+    const paths = {};
+    const hcs = F.circuits || [];
+    hcs.forEach((c) => {
+      const s = c.n === 1 ? '' : String(c.n);
+      const d = groupDur([{ ...c, on: true }]) / speed;
+      [`hc-vl${s}`, `hc-body${s}`, `hc-rl${s}`].forEach((id) => { paths[`f-${id}`] = d; });
+    });
+    hcs.slice(1).forEach(({ n }) => { paths[`f-hc-up${n}`] = paths[`f-hc-down${n}`] = groupDur(hcs.slice(n - 1)) / speed; });
+    if (hcs.length > 1) paths['f-hc-trunk-vl'] = paths['f-hc-trunk-rl'] = groupDur(hcs) / speed;
     this._speedDurs = {
-      flow: dur / speed, fan: fanDur / speed, pump: pumpDur / speed,
+      flow: dur / speed, fan: fanDur / speed, pump: pumpDur / speed, paths,
       primary: (Number.isFinite(vol) && vol > 0 ? Math.min(Math.max(800 / vol, 0.6), 30) : pumpDur) / speed,
     };
     this.style.setProperty('--hfc-electrical', scaled(1.1));
@@ -6906,7 +6933,7 @@ class HeatpumpFlowCard extends HTMLElement {
 
     this._txtPre('t-vl', 'VL', this._has('flow') ? this._t(tFlow) : '');
     this._txtPre('t-rl', 'RL', this._has('return') ? this._t(tRet) : '');
-    this._txt('t-vol', this._has('volume') && flowLoop && Number.isFinite(vol) ? this._flowText(vol) : '');
+    this._txt('t-vol', this._has('volume') && (flowLoop || F.passiveFlow) && Number.isFinite(vol) ? this._flowText(vol) : '');
 
     // heat pump
     this._cls('fan', fanOn); this._cls('fan2', fanOn);
@@ -7143,7 +7170,7 @@ class HeatpumpFlowCard extends HTMLElement {
       el.getAnimations().forEach((a) => { if (a._hfcRate !== 1 / seconds) { a._hfcRate = 1 / seconds; a.updatePlaybackRate(1 / seconds); } });
     };
     const all = (sel) => this.shadowRoot.querySelectorAll(sel);
-    all('.flow').forEach((el) => set(el, d.flow));
+    all('.flow').forEach((el) => set(el, d.paths?.[el.id] ?? d.flow));
     all('.fan').forEach((el) => set(el, d.fan));
     all('.impeller').forEach((el) => set(el, el.id === 'impeller-primary' ? d.primary : d.pump));
   }

@@ -443,6 +443,7 @@ const HFC_PRESETS = {
         starts_total: s('compressor_starts'),
         hours: s('compressor_hours'),
         aux_hours: s('heating_rod_hours'),
+        aux_starts: s('heating_rod_starts'),
         compressor_speed: s('compressor_modulation'),
         solar_collector: s('collector_temperature'),
         solar_pump: b('solar_pump'),
@@ -628,6 +629,7 @@ const HFC_PRESETS = {
         hours: counters.hours,
         starts_total: counters.starts,
         aux_hours: counters.aux_hours,
+        aux_starts: counters.aux_starts,
       };
     },
     // Daily energy per device and mode ("Consumed Electrical Energy Heating", "Heat Generated Domestic Hot Water" …), of the
@@ -1502,7 +1504,7 @@ const HFC_I18N = {
     diagnostic_copy: 'Copy diagnostic report', diagnostic_copied: 'Diagnostic report copied', diagnostic_failed: 'Could not copy diagnostic report',
     fullscreen_open: 'Open full screen', fullscreen_close: 'Close full screen',
     det: {
-      hours: 'Compressor hours', starts_total: 'Compressor starts total', aux_hours: 'Heater hours', energy_total: 'Electricity total',
+      hours: 'Compressor hours', starts_total: 'Compressor starts total', aux_hours: 'Heater hours', aux_starts: 'Heater starts total', energy_total: 'Electricity total',
       cutout_high_pressure: 'High-pressure cut-outs', cutout_low_pressure: 'Low-pressure cut-outs', cutout_temperature: 'Temperature cut-outs',
       env_energy: 'Environmental energy total', heat_total: 'Heat total', cop_total: 'COP total', compressor_speed: 'Compressor', evap_temp: 'Evaporation', cond_temp: 'Condensation',
       suction_temp: 'Suction gas', hot_gas: 'Hot gas', liquid_temp: 'Liquid line', low_pressure: 'Low pressure', high_pressure: 'High pressure',
@@ -1545,7 +1547,7 @@ const HFC_I18N = {
     diagnostic_copy: 'Diagnosebericht kopieren', diagnostic_copied: 'Diagnosebericht kopiert', diagnostic_failed: 'Diagnosebericht konnte nicht kopiert werden',
     fullscreen_open: 'Vollbild öffnen', fullscreen_close: 'Vollbild schließen',
     det: {
-      hours: 'Betriebsstunden Verdichter', starts_total: 'Verdichterstarts gesamt', aux_hours: 'Betriebsstunden Heizstab', energy_total: 'Strom gesamt',
+      hours: 'Betriebsstunden Verdichter', starts_total: 'Verdichterstarts gesamt', aux_hours: 'Betriebsstunden Heizstab', aux_starts: 'Heizstab-Starts gesamt', energy_total: 'Strom gesamt',
       cutout_high_pressure: 'Hochdruck-Abschaltungen', cutout_low_pressure: 'Niederdruck-Abschaltungen', cutout_temperature: 'Temperatur-Abschaltungen',
       env_energy: 'Umweltenergie gesamt', heat_total: 'Wärme gesamt', cop_total: 'COP gesamt', compressor_speed: 'Verdichter', evap_temp: 'Verdampfung', cond_temp: 'Kondensation',
       suction_temp: 'Sauggas', hot_gas: 'Heißgas', liquid_temp: 'Flüssigkeitsleitung', low_pressure: 'Niederdruck', high_pressure: 'Hochdruck',
@@ -1590,7 +1592,7 @@ const HFC_I18N = {
     diagnostic_copy: 'Kopiuj raport diagnostyczny', diagnostic_copied: 'Skopiowano raport diagnostyczny', diagnostic_failed: 'Nie udało się skopiować raportu diagnostycznego',
     fullscreen_open: 'Otwórz na pełnym ekranie', fullscreen_close: 'Zamknij pełny ekran',
     det: {
-      hours: 'Czas pracy sprężarki', starts_total: 'Liczba uruchomień sprężarki', aux_hours: 'Czas pracy grzałki', energy_total: 'Energia elektryczna ogółem',
+      hours: 'Czas pracy sprężarki', starts_total: 'Liczba uruchomień sprężarki', aux_hours: 'Czas pracy grzałki', aux_starts: 'Liczba uruchomień grzałki', energy_total: 'Energia elektryczna ogółem',
       cutout_high_pressure: 'Wyłączenia wysokie ciśnienie', cutout_low_pressure: 'Wyłączenia niskie ciśnienie', cutout_temperature: 'Wyłączenia temperatura',
       env_energy: 'Energia z otoczenia ogółem', heat_total: 'Ciepło ogółem', cop_total: 'COP całkowity', compressor_speed: 'Sprężarka', evap_temp: 'Parowanie', cond_temp: 'Kondensacja',
       suction_temp: 'Gaz ssawny', hot_gas: 'Gorący gaz', liquid_temp: 'Linia cieczowa', low_pressure: 'Niskie ciśnienie', high_pressure: 'Wysokie ciśnienie',
@@ -1636,7 +1638,7 @@ const HFC_I18N = {
     diagnostic_copy: 'Kopírovať diagnostickú správu', diagnostic_copied: 'Diagnostická správa bola skopírovaná', diagnostic_failed: 'Nepodarilo sa skopírovať diagnostickú správu',
     fullscreen_open: 'Otvoriť na celú obrazovku', fullscreen_close: 'Zatvoriť celú obrazovku',
     det: {
-      hours: 'Prevádzkové hodiny kompresora', starts_total: 'Celkový počet štartov kompresora', aux_hours: 'Hodiny prídavného ohrevu', energy_total: 'Celková elektrina',
+      hours: 'Prevádzkové hodiny kompresora', starts_total: 'Celkový počet štartov kompresora', aux_hours: 'Hodiny prídavného ohrevu', aux_starts: 'Celkový počet štartov prídavného ohrevu', energy_total: 'Celková elektrina',
       cutout_high_pressure: 'Vysokotlakové vypnutia', cutout_low_pressure: 'Nízkotlakové vypnutia', cutout_temperature: 'Teplotné vypnutia',
       env_energy: 'Celková energia prostredia', heat_total: 'Celkové vyrobené teplo', cop_total: 'Celkové COP', compressor_speed: 'Kompresor', evap_temp: 'Odparovanie', cond_temp: 'Kondenzácia',
       suction_temp: 'Nasávaný plyn', hot_gas: 'Horúci plyn', liquid_temp: 'Kvapalinové potrubie', low_pressure: 'Nízky tlak', high_pressure: 'Vysoký tlak',
@@ -1680,7 +1682,7 @@ const HFC_I18N = {
     diagnostic_copy: 'Kopírovat diagnostickou zprávu', diagnostic_copied: 'Diagnostická zpráva byla zkopírována', diagnostic_failed: 'Nepodařilo se zkopírovat diagnostickou zprávu',
     fullscreen_open: 'Otevřít na celou obrazovku', fullscreen_close: 'Zavřít celou obrazovku',
     det: {
-      hours: 'Provozní hodiny kompresoru', starts_total: 'Celkový počet startů kompresoru', aux_hours: 'Hodiny přídavného ohřevu', energy_total: 'Celková elektřina',
+      hours: 'Provozní hodiny kompresoru', starts_total: 'Celkový počet startů kompresoru', aux_hours: 'Hodiny přídavného ohřevu', aux_starts: 'Celkový počet startů přídavného ohřevu', energy_total: 'Celková elektřina',
       cutout_high_pressure: 'Vysokotlaká vypnutí', cutout_low_pressure: 'Nízkotlaká vypnutí', cutout_temperature: 'Teplotní vypnutí',
       env_energy: 'Celková energie prostředí', heat_total: 'Celkové vyrobené teplo', cop_total: 'Celkové COP', compressor_speed: 'Kompresor', evap_temp: 'Odpařování', cond_temp: 'Kondenzace',
       suction_temp: 'Nasávaný plyn', hot_gas: 'Horký plyn', liquid_temp: 'Kapalinové potrubí', low_pressure: 'Nízký tlak', high_pressure: 'Vysoký tlak',
@@ -1724,7 +1726,7 @@ const HFC_I18N = {
     diagnostic_copy: 'Diagnoserapport kopiëren', diagnostic_copied: 'Diagnoserapport gekopieerd', diagnostic_failed: 'Diagnoserapport kopiëren mislukt',
     fullscreen_open: 'Volledig scherm openen', fullscreen_close: 'Volledig scherm sluiten',
     det: {
-      hours: 'Compressoruren', starts_total: 'Compressorstarts totaal', aux_hours: 'Uren bijverwarming', energy_total: 'Stroom totaal',
+      hours: 'Compressoruren', starts_total: 'Compressorstarts totaal', aux_hours: 'Uren bijverwarming', aux_starts: 'Starts bijverwarming totaal', energy_total: 'Stroom totaal',
       cutout_high_pressure: 'Hogedrukuitschakelingen', cutout_low_pressure: 'Lagedrukuitschakelingen', cutout_temperature: 'Temperatuuruitschakelingen',
       env_energy: 'Omgevingsenergie totaal', heat_total: 'Warmte totaal', cop_total: 'COP totaal', compressor_speed: 'Compressor', evap_temp: 'Verdamping', cond_temp: 'Condensatie',
       suction_temp: 'Zuiggas', hot_gas: 'Heetgas', liquid_temp: 'Vloeistofleiding', low_pressure: 'Lage druk', high_pressure: 'Hoge druk',
@@ -2489,7 +2491,7 @@ const HFC_ENTITY_GROUPS = {
   sec_hc5: ['hc5_flow', 'hc5_return', 'hc5_setpoint', 'hc5_mode', 'hc5_pump', 'hc5_volume', 'hc5_curve_offset', 'hc5_mixer', 'hc5_mixer_opening', 'hc5_mixer_closing', 'hc5_room', 'hc5_room_target', 'hc5_room_humidity', 'hc5_dew_point'],
   sec_hc6: ['hc6_flow', 'hc6_return', 'hc6_setpoint', 'hc6_mode', 'hc6_pump', 'hc6_volume', 'hc6_curve_offset', 'hc6_mixer', 'hc6_mixer_opening', 'hc6_mixer_closing', 'hc6_room', 'hc6_room_target', 'hc6_room_humidity', 'hc6_dew_point'],
   sec_power: ['pv', 'battery', 'grid'],
-  sec_details: ['hours', 'starts_total', 'aux_hours', 'energy_total', 'env_energy', 'heat_total'],
+  sec_details: ['hours', 'starts_total', 'aux_hours', 'aux_starts', 'energy_total', 'env_energy', 'heat_total'],
   sec_refrigerant: ['compressor_speed', 'evap_temp', 'cond_temp', 'suction_temp', 'hot_gas', 'liquid_temp', 'low_pressure', 'high_pressure', 'eev', 'superheat', 'subcooling'],
   sec_cutouts: ['cutout_high_pressure', 'cutout_low_pressure', 'cutout_temperature'],
   sec_stats: ['cop_heating_today', 'cop_dhw_today', 'energy_today', 'pv_share_today', 'starts_today'],
@@ -2543,7 +2545,7 @@ const HFC_KEY_KINDS = Object.fromEntries(Object.entries({
   flowrate: ['volume', 'source_volume', 'hc_volume'],
   hours: ['hours', 'aux_hours'],
   percent: ['pv_share_today', 'hc_mixer', 'room_humidity'],
-  counter: ['starts_total', 'starts_today', 'cutout_high_pressure', 'cutout_low_pressure', 'cutout_temperature'],
+  counter: ['starts_total', 'starts_today', 'aux_starts', 'cutout_high_pressure', 'cutout_low_pressure', 'cutout_temperature'],
   ratio: ['cop_heating_today', 'cop_dhw_today'],
   speed: ['compressor', 'fan_speed', 'compressor_speed'],
   onoff: ['defrost', 'circulation', 'hc_pump', 'primary_pump_state', 'hc_mixer_opening', 'hc_mixer_closing', 'solar_pump', 'bypass_valve'],
@@ -4727,7 +4729,11 @@ class HeatpumpFlowCard extends HTMLElement {
     if (period === 'today' && legacy && !Object.entries(map).some(([p, id]) => p !== 'today' && id === legacy)) return { id: legacy };
     if (map[period]) return { id: map[period] };
     const total = map.total;
-    if (total && HFC_STAT_PERIODS[period] && ['total', 'total_increasing'].includes(this._hass.states[total]?.attributes?.state_class)) return { stat: total };
+    const stateClass = this._hass.states[total]?.attributes?.state_class;
+    if (total && HFC_STAT_PERIODS[period] && ['total', 'total_increasing'].includes(stateClass)) return { stat: total };
+    // A start or hour counter that the integration reports as a measurement (myPyllant On/Off Cycles, #1) has no "change" in the
+    // statistics, but its hourly minimum and maximum: since it only counts up, maximum − minimum over the period is its rise.
+    if (total && HFC_STAT_PERIODS[period] && stateClass === 'measurement' && ['count', 'hours'].includes(def.kind)) return { stat: total, range: true };
     if (def.ratio) {
       const parts = def.ratio.map((k) => [this._tileSource(k, period), HFC_TILES[k].kind]);
       if (parts.every(([s]) => s)) return { ratio: parts };
@@ -4781,10 +4787,15 @@ class HeatpumpFlowCard extends HTMLElement {
     return this._statCache[key]?.v;
   }
 
-  // Change of a total counter over a calendar period from the recorder's long-term statistics.
-  _statChange(id, kind, period) {
+  // Change of a total counter over a calendar period from the recorder's long-term statistics; with `range`, of a counter kept as a
+  // measurement, from its maximum and minimum in the period.
+  _statChange(id, kind, period, range = false) {
     const [calendar, offset] = HFC_STAT_PERIODS[period];
-    const v = this._wsCached(`${id}|${period}`, { type: 'recorder/statistic_during_period', statistic_id: id, calendar: { period: calendar, offset }, types: ['change'] }, (res) => res?.change);
+    const msg = { type: 'recorder/statistic_during_period', statistic_id: id, calendar: { period: calendar, offset }, types: range ? ['max', 'min'] : ['change'] };
+    const pick = range
+      ? (res) => (typeof res?.max === 'number' && typeof res?.min === 'number' ? Math.max(0, res.max - res.min) : undefined)
+      : (res) => res?.change;
+    const v = this._wsCached(`${id}|${period}${range ? '|range' : ''}`, msg, pick);
     return typeof v === 'number' ? this._toBase(v, this._hass.states[id]?.attributes?.unit_of_measurement, kind, period) : NaN;
   }
 
@@ -4872,7 +4883,7 @@ class HeatpumpFlowCard extends HTMLElement {
   _srcValue(src, kind, period) {
     if (!src) return NaN;
     if (src.id) return this._tileRead(src.id, kind, period);
-    if (src.stat) return this._statChange(src.stat, kind, period);
+    if (src.stat) return this._statChange(src.stat, kind, period, !!src.range);
     if (src.ratio) { const [a, b] = src.ratio.map(([s, k]) => this._srcValue(s, k, period)); return b > 0 && a >= 0 ? a / b : NaN; }
     if (src.envCop) {
       const environmental = this._srcValue(src.envCop[0], 'energy', period); const electricity = this._srcValue(src.envCop[1], 'energy', period);
@@ -5009,7 +5020,7 @@ class HeatpumpFlowCard extends HTMLElement {
     // Entities that are unknown or unavailable (not reported by this model) are left out.
     const ok = (key) => this._has(key) && !['unknown', 'unavailable'].includes(this._s(key));
     const row = (key) => (ok(key) ? [key, D[key], this._e[key], () => this._fmtState(key)] : null);
-    const op = ['hours', 'starts_total', 'aux_hours', 'energy_total', 'env_energy', 'heat_total'].map(row);
+    const op = ['hours', 'starts_total', 'aux_hours', 'aux_starts', 'energy_total', 'env_energy', 'heat_total'].map(row);
     if (ok('energy_total') && (ok('heat_total') || ok('env_energy'))) {
       op.push(['cop_total', D.cop_total, ok('heat_total') ? this._e.heat_total : this._e.env_energy, () => {
         const electricity = kwh('energy_total');

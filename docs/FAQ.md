@@ -24,7 +24,11 @@ Yes. Without `valve` the card takes the hot-water side from the operating mode (
 
 ## A stat tile stays empty or shows "–"
 
-Tiles for today, the week, the month or the year read the period from the long-term statistics of a total counter. Home Assistant keeps those statistics only for sensors with `state_class: total` or `total_increasing`; check the attributes of the counter under *Developer tools → States*. Without a `state_class`, map a counter of the period itself, or a total counter that has one, with `tile_sources` ([Stat tiles](../README.md#stat-tiles)). A newly mapped counter fills its periods as Home Assistant collects statistics.
+Tiles for today, the week, the month or the year read the period from the long-term statistics of a total counter. Home Assistant keeps those statistics only for sensors with a `state_class`; check the attributes of the counter under *Developer tools → States*. Energy counters need `total` or `total_increasing`. Start and hour counters also work with `measurement` (myPyllant reports them that way): since they only count up, the card takes the period from their highest and lowest value. Without a `state_class`, map a counter of the period itself, or a total counter that has one, with `tile_sources` ([Stat tiles](../README.md#stat-tiles)). A newly mapped counter fills its periods as Home Assistant collects statistics.
+
+## Which sensor does the hot-water standby-loss tile need? Watts?
+
+No watts and no loss sensor: the tile shows the cool-down of the tank in K/h and computes it itself from the recorder history. It needs a plain temperature sensor in the tank (`dhw_top`, or `dhw_loss_sensor` when `dhw_top` is an estimated value) and an operating-mode or compressor entity, so it can tell standby from charging. Over the last 48 hours it fits the standby windows of at least 3 hours and leaves out charging, draw-off and the heater rod. A sensor that already reports °C/h cannot be fed into the tile. It is a temperature measure, not an energy: kWh would need the tank volume ([Stat tiles](../README.md#stat-tiles)).
 
 ## How do I put switches or selects on the card, for example one per heating circuit?
 

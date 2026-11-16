@@ -3336,6 +3336,48 @@
     `the daily energy tiles take the heat pump's counters, not the station's (${r.tiles.energy_heating.today})`);
     r = resolve({ ...counters, 'sensor.home_device_1_hydraulic_station_current_power': ['5', 'W'] });
     check(r.entities.power === 'sensor.home_device_1_hydraulic_station_current_power', `with only the station reporting power, it stays the fallback (${r.entities.power})`);
+
+    // #1: the station's starts have their own row in the details, and myPyllant keeps its start and hour counters as a measurement:
+    // today, week and month come from the minimum and maximum of their statistics, a total counter keeps the "change".
+    check(resolve(counters).entities.aux_starts === 'sensor.home_device_1_hydraulic_station_on_off_cycles', 'the station\'s starts are an entity of the details');
+    const meas = (state, unit) => ({ state, attributes: { ...(unit ? { unit_of_measurement: unit } : {}), state_class: 'measurement' } });
+    const mstates = { ...counters, 'sensor.home_device_1_hydraulic_station_on_off_cycles': meas('12'),
+      'sensor.home_device_0_arotherm_plus_on_off_cycles': meas('2329'), 'sensor.home_device_0_arotherm_plus_operation_time': meas('4165.5', 'h') };
+    const asked = [];
+    const statHass = (states) => {
+      const h = hassOf(toStates(states), reg(states));
+      h.callWS = (m) => {
+        if (m.type !== 'recorder/statistic_during_period') return Promise.reject(new Error('n/a'));
+        asked.push(m);
+        const station = m.statistic_id.includes('hydraulic'); const time = m.statistic_id.includes('operation_time');
+        const span = station ? { day: [11, 12] } : time ? { day: [4160, 4165.5] } : { week: [2300, 2329], month: [2200, 2329] };
+        const v = span[m.calendar.period];
+        if (m.types.includes('change')) return Promise.resolve({ change: 4 });
+        return Promise.resolve(v ? { min: v[0], max: v[1] } : {});
+      };
+      return h;
+    };
+    const statTiles = async (states) => {
+      const h = statHass(states);
+      const c = mount({ preset: 'vaillant', tiles: ['aux_starts:today', 'starts:week', 'starts:month', 'hours:today'] }, h);
+      await wait(30); c.hass = { ...h }; await wait(30);
+      const out = { tiles: tileRows(c), rows: Object.fromEntries(c._drawerRows().flatMap(([, list]) => list).map(([, label, , value]) => [label, value()])) };
+      c.remove();
+      return out;
+    };
+    const m1 = await statTiles(mstates);
+    const val = (re) => parseFloat((m1.tiles.find(([label]) => re.test(label)) || [])[1]);
+    check(val(/^Heater starts/) === 1 && val(/^Compressor starts.*week/) === 29 && val(/^Compressor starts.*month/) === 129 && val(/^Compressor hours/) === 5.5,
+      `measurement counters give their periods from maximum − minimum (${JSON.stringify(m1.tiles)})`);
+    check(asked.length > 0 && asked.every((m) => m.types.join() === 'max,min'), `a measurement counter asks for max and min, not change (${[...new Set(asked.map((m) => m.types.join()))]})`);
+    check(m1.rows['Heater starts total'] !== undefined && /12/.test(m1.rows['Heater starts total']), `the details show the heater starts next to the heater hours (${JSON.stringify(m1.rows)})`);
+    asked.length = 0;
+    const totalStates = { ...mstates, 'sensor.home_device_1_hydraulic_station_on_off_cycles': { state: '12', attributes: { state_class: 'total_increasing' } } };
+    const m2 = await statTiles(totalStates);
+    check(parseFloat((m2.tiles.find(([label]) => /^Heater starts/.test(label)) || [])[1]) === 4
+      && asked.some((m) => m.statistic_id.includes('hydraulic') && m.types.join() === 'change'), `a total counter keeps the change (${JSON.stringify(m2.tiles)})`);
+    const plain = { ...mstates, 'sensor.home_device_1_hydraulic_station_on_off_cycles': '12' };
+    check(!(await statTiles(plain)).tiles.some(([label]) => /^Heater starts/.test(label)), 'a counter without a state class still has no calendar periods');
   }
 
   // 14. outdoor unit drawings: style per preset, manufacturer variants, fans and snowflakes, loop symbol for ground sources

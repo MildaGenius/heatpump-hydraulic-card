@@ -906,6 +906,9 @@ const HFC_PRESETS = {
         aux_hours: { total: `${m}room_heater_operations_hours` },
       };
     },
+    // The operations counter also counts the two restarts of every defrost, both while defrosting_state is on (#407). Starts of
+    // today, yesterday and the week leave them out (recorder history); longer periods keep the raw counter.
+    defrost_restarts: true,
   },
 
   // Wolf heat pumps (CHA …) via the core wolflink integration or the custom wolf_smartset integration (both WOLF Link home and
@@ -2781,6 +2784,9 @@ const HFC_LOSS = { hours: 48, minWindow: 3, settle: 0.5, drawOff: 1.5, rise: 1.0
 // Runs of the timeline: a standstill of `seriesGap` minutes or more starts a new series; a stretch without data shorter than
 // `dataGap` minutes between two running states does not end a run (a Modbus timeout or an integration reload).
 const HFC_RUNS = { seriesGap: 60, dataGap: 2 };
+// Tiles counted from the recorder history (#407): the periods it keeps (about ten days by default), and the seconds after a defrost
+// in which a counter step still belongs to it (the counter can be published a moment after the defrost flag).
+const HFC_HISTORY_COUNT = { periods: ['today', 'yesterday', 'week'], grace: 60 };
 // Runs from fast signals (`run_signal`, #365): a unit of a cascade runs above `unitW` or its `power_threshold`; a dip below the threshold shorter than
 // `dip` minutes does not end a run, and a stretch above it shorter than `min` minutes is no run (a short spike without the compressor).
 const HFC_RUN_SIGNAL = { values: ['auto', 'units', 'power'], unitW: 50, dip: 2, min: 1 };
@@ -4796,6 +4802,12 @@ class HeatpumpFlowCard extends HTMLElement {
     if (period === 'today' && legacy && !Object.entries(map).some(([p, id]) => p !== 'today' && id === legacy)) return { id: legacy };
     if (map[period]) return { id: map[period] };
     const total = map.total;
+    // From the recorder history (#407): starts without the restarts of a defrost (preset flag `defrost_restarts`), and defrosts from
+    // the off → on changes of the defrost entity where no counter exists.
+    // An own tile source (`tile_sources`, also "none") is taken as it is: a counter without defrosts must not lose them twice.
+    const recent = HFC_HISTORY_COUNT.periods.includes(period) && this._has('defrost') && !Object.hasOwn(this._config.tile_sources || {}, key);
+    if (recent && key === 'starts' && total && this._preset?.defrost_restarts) return { history: 'starts', counter: total };
+    if (recent && key === 'defrosts' && !total) return { history: 'defrosts' };
     const stateClass = this._hass.states[total]?.attributes?.state_class;
     if (total && HFC_STAT_PERIODS[period] && ['total', 'total_increasing'].includes(stateClass)) return { stat: total };
     // A start or hour counter that the integration reports as a measurement (myPyllant On/Off Cycles, #1) has no "change" in the
@@ -4864,6 +4876,37 @@ class HeatpumpFlowCard extends HTMLElement {
       : (res) => res?.change;
     const v = this._wsCached(`${id}|${period}${range ? '|range' : ''}`, msg, pick);
     return typeof v === 'number' ? this._toBase(v, this._hass.states[id]?.attributes?.unit_of_measurement, kind, period) : NaN;
+  }
+
+  // Defrosts, or starts without the restarts of a defrost, in a period from the recorder history (#407). A defrost is an off → on
+  // change of the defrost entity; one that was already going at the start of the period belongs to the period before. A start is a
+  // step of the counter; a step while the defrost entity is on, or up to HFC_HISTORY_COUNT.grace seconds after, is a restart of that
+  // defrost. NaN while the history loads or when it is not available.
+  _historyCount(src, period) {
+    const range = this._periodRange(period); const defrost = this._e.defrost;
+    if (!range || !defrost) return NaN;
+    const ids = [defrost, src.counter].filter(Boolean);
+    const hist = this._wsCached(`hcount|${ids.join(',')}|${period}`, {
+      type: 'history/history_during_period', start_time: range[0], ...(range[1] ? { end_time: range[1] } : {}), entity_ids: ids,
+      minimal_response: true, no_attributes: true, significant_changes_only: false,
+    }, (res) => this._timelineHistory(res, ids));
+    if (!hist) return NaN;
+    const known = (s) => !['unknown', 'unavailable', 'none', ''].includes(String(s ?? '').trim().toLowerCase());
+    const on = (s) => hfcCompressorOn(s);
+    const d = hist[defrost] || [];
+    if (src.history === 'defrosts') return d.filter((e, n) => n > 0 && on(e.s) && known(d[n - 1].s) && !on(d[n - 1].s)).length;
+    // Defrost windows [from, to + grace).
+    const windows = d.map((e, n) => (on(e.s) ? [e.t, (d[n + 1]?.t ?? Infinity) + HFC_HISTORY_COUNT.grace * 1000] : null)).filter(Boolean);
+    const inDefrost = (t) => windows.some(([a, b]) => t >= a && t < b);
+    let starts = 0; let last = NaN;
+    (hist[src.counter] || []).forEach((e) => {
+      const v = parseFloat(e.s);
+      if (!Number.isFinite(v)) return;
+      // A counter that drops (reset, replaced unit) starts over; only steps upwards count.
+      if (Number.isFinite(last) && v > last && !inDefrost(e.t)) starts += v - last;
+      last = v;
+    });
+    return starts;
   }
 
   // Price per kWh from the tile's or the card's `price`: a number or an entity; ct/kWh and per-MWh prices are converted.
@@ -4951,6 +4994,7 @@ class HeatpumpFlowCard extends HTMLElement {
     if (!src) return NaN;
     if (src.id) return this._tileRead(src.id, kind, period);
     if (src.stat) return this._statChange(src.stat, kind, period, !!src.range);
+    if (src.history) return this._historyCount(src, period);
     if (src.ratio) { const [a, b] = src.ratio.map(([s, k]) => this._srcValue(s, k, period)); return b > 0 && a >= 0 ? a / b : NaN; }
     if (src.envCop) {
       const environmental = this._srcValue(src.envCop[0], 'energy', period); const electricity = this._srcValue(src.envCop[1], 'energy', period);
@@ -4962,6 +5006,7 @@ class HeatpumpFlowCard extends HTMLElement {
   _tileEntity(src, period) {
     if (!src) return '';
     if (src.id || src.stat) return src.id || src.stat;
+    if (src.history) return src.counter || this._e.defrost;
     if (src.ratio) return this._tileEntity(src.ratio[0][0], period);
     if (src.envCop) return this._tileEntity(src.envCop[0], period);
     if (src.classes) return this._tileMap.load_class1;

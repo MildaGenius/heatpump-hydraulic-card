@@ -6063,6 +6063,18 @@ class HeatpumpFlowCard extends HTMLElement {
         const kind = p.kind === 'pv' ? 'heat' : p.kind;
         if (!['defrost', 'sg-boost', 'sg-forced'].includes(kind) && parts[parts.length - 1]?.kind !== kind) parts.push({ kind, from: p.from });
       });
+      // A period under a minute is no period of its own, as a whole run under a minute is no run (HFC_RUN_SIGNAL.min): it folds into
+      // the period before it, the first one into the next. The hot-water flag can end about 30 s before the compressor has ramped
+      // down, which left a heating piece of 30 s after each charge (#173). A last period that is still going keeps its place.
+      const minMs = HFC_RUN_SIGNAL.min * 60000;
+      for (let n = 0; parts.length > 1 && n < parts.length;) {
+        const from = n ? parts[n].from : r.from; const to = parts[n + 1]?.from ?? r.to;
+        if (to - from >= minMs || (n === parts.length - 1 && r.ongoing)) { n++; continue; }
+        parts.splice(n, 1);
+        // Neighbours of the same kind become one period again; start over, since earlier periods may have grown.
+        for (let k = parts.length - 1; k > 0; k--) if (parts[k].kind === parts[k - 1].kind) parts.splice(k, 1);
+        n = 0;
+      }
       if (parts.length < 2) return [r];
       return parts.map((part, n) => {
         const from = n ? part.from : r.from; const to = parts[n + 1]?.from ?? r.to;

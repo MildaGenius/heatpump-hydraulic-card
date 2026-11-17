@@ -4644,7 +4644,8 @@
   }
   {
     // #413: a preset's default tiles replace the default row while `tiles` is not set; `tiles` and an empty list still win.
-    const s = setups[0];
+    // The demo "Lambda" (legacy naming), chosen by name, since the block changes the Lambda preset for its run.
+    const s = setups.find((x) => x.name === 'Lambda' && x.config.preset === 'lambda');
     const states = toStates(s.states('heat'));
     const saved = HFC_PRESETS.lambda.default_tiles;
     HFC_PRESETS.lambda.default_tiles = ['spread', 'volume'];

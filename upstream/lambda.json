@@ -1,9 +1,9 @@
 {
   "preset": "lambda",
   "reviewed": {
-    "date": "2026-11-10",
-    "version": "V3.7.0",
-    "note": "V3.6.3 and V3.7.0 checked: outdoor temperature at -0.1 °C fixed, new runtime sensors per mode (heating/hot_water/defrost/heating_rod runtime total/daily), heating-to-hot-water switch counters, pv_temperature_increase numbers, Lambda Cockpit dashboard. Additions only; the runtime totals are candidates for the hours tiles."
+    "date": "2026-11-17",
+    "version": "V3.7.2",
+    "note": "V3.7.2 checked: Lambda Cockpit only (several heating circuits, compressor starts today as a cockpit tile, unit conversion), climate entities on the native_* temperature interface. compressor_start_cycling_daily is already mapped as starts_today; nothing changed for the preset."
   },
   "unmapped": {
     "hc_pump": "The heating-circuit registers of the Lambda Modbus interface (5000 + 100n) have no pump state."

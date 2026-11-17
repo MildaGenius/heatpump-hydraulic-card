@@ -519,6 +519,15 @@
     const report = C._diagnosticReport(cfg, hassOf(own, registry));
     check(report.includes('Tile sources (own):') && report.includes('energy_heating total: sensor.ol_el_hc') && report.includes('heat_dhw: none'),
       'tile_sources: listed in the diagnostic report');
+    // HA 2026.12 (core #192458): live heat output and today's heat per use.
+    const hp = { ...states, ...toStates({ 'sensor.vc_heat_now': ['3.4', 'kW'], 'sensor.vc_heat_hc_today': ['21.5', 'kWh'], 'sensor.vc_heat_dhw_today': ['4.2', 'kWh'] }) };
+    const hpReg = { ...registry, 'sensor.vc_heat_now': { platform: 'vicare', translation_key: 'heat_production_current' },
+      'sensor.vc_heat_hc_today': { platform: 'vicare', translation_key: 'heat_production_heating_today' },
+      'sensor.vc_heat_dhw_today': { platform: 'vicare', translation_key: 'heat_production_dhw_today' } };
+    const hr = C._resolve({ preset: 'vicare' }, hassOf(hp, hpReg));
+    check(hr.entities.heat === 'sensor.vc_heat_now' && hr.tiles.heat_heating?.today === 'sensor.vc_heat_hc_today' && hr.tiles.heat_dhw?.today === 'sensor.vc_heat_dhw_today',
+      `ViCare heat production: live heat and today's heat per use (${hr.entities.heat} / ${JSON.stringify([hr.tiles.heat_heating, hr.tiles.heat_dhw])})`);
+    check(v.heat === undefined, 'ViCare without the heat production sensors keeps the estimated heat');
   }
 
   // #196: ViCare Vitocal 250 without domestic_hot_water_charging, compressor_phase stays "ready" while the compressor runs (#186)
@@ -697,7 +706,8 @@
   {
     // One rule for "the compressor runs": the live view, the timeline segments and the runs agree on every state.
     const M = 60000;
-    const states = ['on', 'off', '1', '0', '0.00', '-1', '42', '12.5 Hz', 'standby', 'Running', 'true', 'false'];
+    // Running texts of state enums count as on (NIBE STOPPED/STARTING/RUNNING/STOPPING, #253).
+    const states = ['on', 'off', '1', '0', '0.00', '-1', '42', '12.5 Hz', 'standby', 'Running', 'true', 'false', 'STARTING', 'STOPPING', 'STOPPED'];
     const card = mount({ entities: { compressor: 'sensor.c' } }, hassOf(toStates({ 'sensor.c': '0' }))); await wait(20);
     const live = (s) => { card._hass.states['sensor.c'].state = s; return card._flowModel().running; };
     const hist = { 'sensor.c': states.map((s, n) => ({ t: n * 10 * M, s })) };
@@ -707,7 +717,7 @@
     const runs = card._timelineRuns(hist, { cycle: 'sensor.c' }, [], 0, states.length * 10 * M);
     const runAt = (n) => runs.some((r) => r.from <= n * 10 * M && r.to > n * 10 * M);
     const rows = states.map((s, n) => `${s}:${live(s) ? 1 : 0}${segAt(n) === 'heat' ? 1 : 0}${runAt(n) ? 1 : 0}`);
-    const expected = 'on:111 off:000 1:111 0:000 0.00:000 -1:000 42:111 12.5 Hz:111 standby:000 Running:000 true:111 false:000';
+    const expected = 'on:111 off:000 1:111 0:000 0.00:000 -1:000 42:111 12.5 Hz:111 standby:000 Running:111 true:111 false:000 STARTING:111 STOPPING:000 STOPPED:000';
     check(rows.join(' ') === expected, `compressor on: live view, timeline and runs follow one rule (${rows.join(' ')})`);
     card.remove();
   }
@@ -2283,6 +2293,16 @@
     states['binary_sensor.error'].state = 'on'; card.hass = { ...card._hass };
     check(active(), 'binary error behaviour stays unchanged');
     card.remove();
+    // #253: error_ok also names numeric codes (NIBE alarm 183 = defrost); other codes stay errors, 0 stays no error.
+    const codes = toStates({ 'sensor.alarm': '183' });
+    const nibe = mount({ errors: ['sensor.alarm'], error_ok: ['183'] }, hassOf(codes));
+    const nibeActive = () => nibe.shadowRoot.getElementById('chip-err').classList.contains('on');
+    check(!nibeActive(), 'a numeric code listed in error_ok is no error');
+    codes['sensor.alarm'].state = '162'; nibe.hass = { ...nibe._hass };
+    check(nibeActive(), 'another numeric code is still an error');
+    codes['sensor.alarm'].state = '0'; nibe.hass = { ...nibe._hass };
+    check(!nibeActive(), 'numeric 0 stays no error');
+    nibe.remove();
     const legacy = mount({ errors: ['sensor.error'] }, hassOf(toStates({ 'sensor.error': 'F13' })));
     check(!legacy.shadowRoot.getElementById('chip-err').classList.contains('on'), 'text errors remain opt-in without error_ok');
     legacy.remove();
@@ -2937,6 +2957,11 @@
     const luxStates = Object.fromEntries(Object.entries(toStates(s.states('heat'))).filter(([id]) => id !== `number.${px}_dhw_target_temperature`));
     const luxFallback = C._resolve(s.config, hassOf({ ...luxStates, ...toStates({ [luxTarget]: ['48.0', '°C'] }) }, luxReg)).entities;
     check(luxFallback.dhw_target === luxTarget, `Luxtronik: the controller's hot-water target stands in for a missing target number (${luxFallback.dhw_target})`);
+    // Compressor speed of inverters (translation key pump_frequency, in Hz from the release after 2026.11.01).
+    const luxFreq = `sensor.${px}_pump_frequency`;
+    const freq = C._resolve(s.config, hassOf(toStates({ ...s.states('heat'), [luxFreq]: ['48.5', 'Hz'] }),
+      { ...reg, [luxFreq]: { entity_id: luxFreq, platform: 'luxtronik2', translation_key: 'pump_frequency' } })).entities;
+    check(freq.compressor_speed === luxFreq && e.compressor_speed === undefined, `Luxtronik compressor speed from pump_frequency where it exists (${freq.compressor_speed} / ${e.compressor_speed})`);
     const two = C._resolve({ ...s.config, hc_count: 2 }, hass('heat')).entities;
     check(two.hc2_flow === undefined && two.hc2_setpoint === undefined, 'Luxtronik: mixing circuit 2 without a target counts as not installed');
     const two2 = C._resolve({ ...s.config, hc_count: 2 }, hass('heat', { [`sensor.${px}_flow_in_circuit2_target_temperature`]: ['36.0', '°C'], [`sensor.${px}_flow_in_circuit2_temperature`]: ['35.2', '°C'] })).entities;

@@ -1,8 +1,9 @@
 {
   "preset": "bosch_buderus_heating",
   "reviewed": {
-    "date": "2026-11-14",
-    "version": "v0.9.1"
+    "date": "2026-11-17",
+    "version": "v0.9.1",
+    "note": "Release commit of v0.9.1 (7c7348f) is the version reviewed on 2026-11-14 (#412): sign-in fix, local access, heat generator models. Nothing new for the preset."
   },
   "unmapped": {
     "hc_return": "The integration reports no return temperature per heating circuit; the heat pump return (TC0) is the card's return."

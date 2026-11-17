@@ -1,8 +1,9 @@
 {
   "preset": "luxtronik",
   "reviewed": {
-    "date": "2026-11-02",
-    "version": "2026.11.01"
+    "date": "2026-11-17",
+    "version": "2026.11.01",
+    "note": "main to d714a8f checked (unreleased after 2026.11.01): pump_frequency is the compressor speed, normalised to Hz, enabled by default and created only on inverters (now mapped as compressor_speed); rolling SCOP and 30-day COP sensors per device (candidates for the COP tiles once released); entity_active refactor without behaviour change; offset parameters writable again."
   },
   "sources": [
     {

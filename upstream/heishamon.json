@@ -1,9 +1,9 @@
 {
   "preset": "heishamon",
   "reviewed": {
-    "date": "2026-11-10",
-    "version": "2.12.4",
-    "note": "2.12.3 and 2.12.4 checked: device classes of read-only binary sensors (RUNNING/HEAT moved to binary_sensor_device_class), native temperature attributes for climate and DHW, firmware update reporting. Entity ids and translation keys unchanged."
+    "date": "2026-11-17",
+    "version": "2.14.0",
+    "note": "2.12.5 to 2.14.0 checked: definitions split into a package (moved, keys unchanged), HA < 2026.1 compatibility dropped, sensors unavailable while HeishaMon is offline (LWT), model refresh button, topics of HeishaMon 4.4. HeishaMon 4.4 turns the Installer settings topic group off by default (buffer/DHW installed, zone sensor settings, ...); the preset uses none of them."
   },
   "unmapped": {
     "hc_return": "HeishaMon reports per zone the water temperature and its target, no return."

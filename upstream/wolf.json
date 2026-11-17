@@ -1,9 +1,9 @@
 {
   "preset": "wolf",
   "reviewed": {
-    "date": "2026-11-10",
-    "version": "0.0.52",
-    "note": "wolf_smartset v0.6.1 checked: expert (Fachmann) parameters are now read-only and become sensors instead of numbers. The preset uses the user-level numbers set_dhw_temperature and day_temperature_mixer_circuit_1, which stay writable; wolf-comm 0.0.52 unchanged."
+    "date": "2026-11-17",
+    "version": "0.0.53",
+    "note": "HA core c2f837b (UpdateFailedUnreachable, coordinator only) and wolf-comm 0.0.53 (nested descriptors: time programs, party and holiday dates; core does not use it yet) checked. Nothing changed for the preset."
   },
   "unmapped": {
     "hc_return": "Both integrations report one return temperature, at the heat pump; no circuit has its own."

@@ -1899,8 +1899,8 @@ const HFC_EDITOR = {
     confirm_buffer_help: 'A buffer separates the heat pump circuit from the heating circuits. A hot-water tank does not count.',
     confirm_primary_pump: 'Does the pump the integration reports also run while hot water is charging?',
     confirm_primary_pump_help: 'Yes: it is the heat pump’s own pump in front of the diverter valve. No: it is the pump of the heating circuit.',
-    confirm_circuits: 'The integration reports heating circuits {from} to {to}, but no circuit 1. Show these circuits?',
-    confirm_circuits_help: 'Yes: the card starts at circuit {from}. No: it keeps circuit 1 first.',
+    confirm_circuits: 'The integration reports heating circuits {from} to {to}, but no circuit {missing}. Show these circuits?',
+    confirm_circuits_help: 'Yes: the card starts at circuit {from}. No: it keeps circuit {missing} first.',
     confirm_yes: 'Yes', confirm_no: 'No', confirm_unknown: 'I don’t know',
     preset_help: 'Found entities are filled in below. Pick another entity to override one, clear a field to hide it.',
     from_energy: 'Empty: taken from the Energy dashboard',
@@ -2001,8 +2001,8 @@ const HFC_EDITOR = {
     confirm_buffer_help: 'Ein Puffer trennt den Wärmepumpenkreis von den Heizkreisen. Ein Warmwasserspeicher zählt nicht.',
     confirm_primary_pump: 'Läuft die Pumpe, die die Integration meldet, auch beim Warmwasserladen?',
     confirm_primary_pump_help: 'Ja: Es ist die Pumpe der Wärmepumpe vor dem Umschaltventil. Nein: Es ist die Pumpe des Heizkreises.',
-    confirm_circuits: 'Die Integration meldet die Heizkreise {from} bis {to}, aber keinen Kreis 1. Diese Kreise zeigen?',
-    confirm_circuits_help: 'Ja: Die Karte beginnt bei Kreis {from}. Nein: Kreis 1 bleibt der erste.',
+    confirm_circuits: 'Die Integration meldet die Heizkreise {from} bis {to}, aber keinen Kreis {missing}. Diese Kreise zeigen?',
+    confirm_circuits_help: 'Ja: Die Karte beginnt bei Kreis {from}. Nein: Kreis {missing} bleibt der erste.',
     confirm_yes: 'Ja', confirm_no: 'Nein', confirm_unknown: 'Weiß ich nicht',
     preset_help: 'Gefundene Entitäten sind unten eingetragen. Andere Entität wählen zum Überschreiben, Feld leeren zum Ausblenden.',
     from_energy: 'Leer: aus dem Energie-Dashboard',
@@ -3557,14 +3557,17 @@ class HeatpumpFlowCard extends HTMLElement {
     //    to 4 (#269). Without an answer the card draws an empty first circuit; "yes" starts at the first one found.
     if (r.preset?.index?.hc !== undefined && r.preset.auto_circuits !== false) {
       const live = (id) => [].concat(id || []).some((x) => hass.states[x] && !['unknown', 'unavailable'].includes(hass.states[x].state));
-      const all = HeatpumpFlowCard._resolve({ preset: config.preset, device: config.device, hc_count: HFC_MAX_HC }, hass).fromPreset;
+      // The same installation as the card (a selected or detected prefix), from the preset's own first circuit on.
+      const all = HeatpumpFlowCard._resolve({ preset: config.preset, device: config.device, prefix: r.prefix || config.prefix, hc_count: HFC_MAX_HC }, hass).fromPreset;
       const found = (n) => ['flow', 'mode', 'pump'].some((k) => live(all[n === 1 ? `hc_${k}` : `hc${n}_${k}`]));
-      let first = 0;
-      for (let n = 2; n <= HFC_MAX_HC && !first; n++) if (found(n)) first = n;
-      if (first && !found(1)) {
-        let last = first;
+      let pos = 0;
+      for (let n = 2; n <= HFC_MAX_HC && !pos; n++) if (found(n)) pos = n;
+      if (pos && !found(1)) {
+        let last = pos;
         while (last < HFC_MAX_HC && found(last + 1)) last++;
-        out.push({ id: 'circuits', key: 'index', first, count: last - first + 1, answered: config.index?.hc !== undefined });
+        // Positions on the card are counted from 1; the integration counts from the preset's index base (myPyllant from 0).
+        const base = +r.preset.index.hc;
+        out.push({ id: 'circuits', key: 'index', base, first: base + pos - 1, count: last - pos + 1, answered: config.index?.hc !== undefined });
       }
     }
     return out;
@@ -8081,9 +8084,10 @@ class HeatpumpFlowCardEditor extends HTMLElement {
     const list = questions.filter((q) => this._layoutShown.has(q.id));
     const esc = (x) => String(x).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
     const value = (q) => (q.id === 'circuits'
-      ? (this._config.index?.hc === q.first ? 'yes' : this._config.index?.hc === 1 ? 'no' : 'unknown')
+      ? (this._config.index?.hc === q.first ? 'yes' : this._config.index?.hc === q.base ? 'no' : 'unknown')
       : this._config[q.key] === true ? 'yes' : this._config[q.key] === false ? 'no' : 'unknown');
-    const text = (q, key) => String(L[`confirm_${q.id}${key}`] || '').replace('{from}', q.first).replace('{to}', q.first + q.count - 1);
+    const text = (q, key) => String(L[`confirm_${q.id}${key}`] || '').replace(/\{from\}/g, q.first).replace(/\{to\}/g, q.first + q.count - 1)
+      .replace(/\{missing\}/g, q.base);
     const html = list.length ? `<ha-alert alert-type="info" title="${esc(L.confirm_title)}">${esc(L.confirm_intro)}</ha-alert>${list.map((q) => `
       <fieldset data-hfc-layout="${q.id}" style="border:0;margin:10px 2px 4px;padding:0">
         <legend style="font-weight:500;padding:0;margin-bottom:6px">${esc(text(q, ''))}</legend>
@@ -8107,7 +8111,7 @@ class HeatpumpFlowCardEditor extends HTMLElement {
       // The circuit count as it was before the first answer, to restore it on "No" and "I don't know".
       this._layoutCount = this._layoutCount || { hc_count: this._config.hc_count };
       const index = { ...(config.index || {}) };
-      if (choice === 'unknown') delete index.hc; else index.hc = choice === 'yes' ? q.first : 1;
+      if (choice === 'unknown') delete index.hc; else index.hc = choice === 'yes' ? q.first : q.base;
       if (Object.keys(index).length) config.index = index; else delete config.index;
       const count = choice === 'yes' ? q.count : this._layoutCount.hc_count;
       if (count === undefined || count === 1) delete config.hc_count; else config.hc_count = count;

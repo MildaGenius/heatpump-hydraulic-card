@@ -397,6 +397,27 @@
       `#299: "yes" starts the card at circuit 2 with three circuits (${legend} / ${JSON.stringify(yes)} / ${flowYes})`);
     check(cout.index === undefined && cout.hc_count === stub.hc_count, `#299: "I don't know" restores the circuit count (${JSON.stringify(cout)})`);
     ce.remove();
+    // Codex review: myPyllant counts circuits from 0, and with two homes the question looks at the selected one only.
+    const mp = {}; const mreg = {};
+    const madd = (id, state, unit) => { mp[id] = unit ? [state, unit] : state; mreg[id] = { platform: 'mypyllant' }; };
+    madd('sensor.home_system_flow_temperature', '35', '°C'); madd('sensor.home_circuit_1_current_flow_temperature', '33', '°C'); madd('sensor.home_circuit_2_current_flow_temperature', '31', '°C');
+    madd('sensor.other_system_flow_temperature', '36', '°C'); madd('sensor.other_circuit_0_current_flow_temperature', '34', '°C');
+    const mh = hassOf(toStates(mp), mreg);
+    const vq = (cfg) => C._layoutQuestions(cfg, mh, C._resolve(cfg, mh)).find((q) => q.id === 'circuits');
+    const home = vq({ preset: 'vaillant', prefix: 'home' });
+    check(home && home.base === 0 && home.first === 1 && home.count === 2 && !vq({ preset: 'vaillant', prefix: 'other' }),
+      `myPyllant: circuits 1 and 2 without circuit 0 in the selected home, none for the other home (${JSON.stringify(home)})`);
+    const ve = document.createElement('heatpump-flow-card-editor');
+    let vout;
+    ve.addEventListener('config-changed', (ev) => { vout = ev.detail.config; });
+    ve.setConfig({ preset: 'vaillant', prefix: 'home' }); ve.hass = mh; await wait(20);
+    const vlegend = ve.querySelector('fieldset[data-hfc-layout="circuits"] legend')?.textContent || '';
+    const vpick = async (value) => { const i = ve.querySelector(`input[data-hfc-layout-choice="circuits"][value="${value}"]`); i.checked = true; i.dispatchEvent(new Event('change', { bubbles: true })); await wait(10); return { ...vout }; };
+    const vyes = await vpick('yes'); const vno = await vpick('no');
+    const vflow = C._resolve(vyes, mh).entities.hc_flow;
+    check(/circuits 1 to 2, but no circuit 0/.test(vlegend) && vyes.index?.hc === 1 && vyes.hc_count === 2 && vflow === 'sensor.home_circuit_1_current_flow_temperature' && vno.index?.hc === 0,
+      `myPyllant: "yes" starts at circuit 1, "no" keeps circuit 0 (${vlegend} / ${JSON.stringify(vyes)} / ${vflow} / ${JSON.stringify(vno)})`);
+    ve.remove();
     add('sensor', 'flow_circuit1_temperature', '38'); add('binary_sensor', 'circuit_1_pump', 'on');
     const withOne = hassOf(toStates(st), reg);
     check(!C._layoutQuestions({ preset: 'open3e', hc_count: 4 }, withOne, C._resolve({ preset: 'open3e', hc_count: 4 }, withOne)).some((q) => q.id === 'circuits'),

@@ -996,6 +996,72 @@ const HFC_PRESETS = {
     },
   },
 
+  // Aira heat pumps (6, 8 and 12 kW) through the HACS integration "ha-airahome" by Invy55 (domain airahome, Bluetooth, #417).
+  // Every entity carries its key as translation key, so entity ids (sensor.ah_<id>_…) and the HA language do not matter.
+  // The outdoor unit feeds a buffer: the indoor unit supply temperature is the buffer tank (integration wiki), the outdoor unit's
+  // supply and return are the heat pump circuit, and each zone has its own supply sensor and circulator.
+  airahome: {
+    name: 'Aira (ha-airahome)',
+    // The outdoor unit's primary circulator feeds the buffer and the hot-water coil.
+    primary_pump: true,
+    detect: (ctx) => (ctx.key('airahome', 'sensor', 'active_state') && ctx.key('airahome', 'sensor', 'ou_supply_temp') ? '' : undefined),
+    entities: (p, i, ctx) => {
+      const s = (tk) => ctx.key('airahome', 'sensor', tk);
+      const b = (tk) => ctx.key('airahome', 'binary_sensor', tk);
+      const n = i.hc;
+      return {
+        mode: s('active_state'),
+        compressor: s('ou_compressor_speed'),
+        compressor_speed: s('ou_compressor_speed'),
+        defrost: b('defrosting'),
+        // The kW sensors are enabled by default, the W ones are not.
+        power: [s('instant_power_kw'), s('instant_power_w')].filter(Boolean),
+        // The integration's heat from the primary flow and the outdoor unit's spread.
+        heat: [s('instant_heat_kw'), s('instant_heat_w')].filter(Boolean),
+        flow: s('ou_supply_temp'),
+        return: s('ou_return_temp'),
+        volume: s('flow_meter_1'),
+        primary_pump_state: b('ou_pump'),
+        outdoor: s('outdoor_temp'),
+        fan_speed: s('ou_fan_1_speed'),
+        heater: b('inline_heater'),
+        dhw_top: s('hot_water_temp'),
+        dhw_target: [s('target_hot_water_temp'), ctx.key('airahome', 'water_heater', 'water_heater')].filter(Boolean),
+        buffer_top: s('indoor_supply_temp'),
+        hc_flow: s(`zone_${n}_supply_temp`),
+        hc_setpoint: s(`zone_${n}_calculated_supply_temp`),
+        hc_mode: s(`zone_${n}_active_state`),
+        hc_pump: b(`zone_${n}_circulator`),
+        room: s(`zone_${n}_temp`),
+        room_target: ctx.key('airahome', 'climate', `zone_${n}_climate`),
+        room_humidity: s(`zone_${n}_humidity`),
+        program: b('away_mode'),
+        energy_total: [s('electricity_kwh'), s('electricity_wh')].filter(Boolean),
+        heat_total: [s('heat_kwh'), s('heat_wh')].filter(Boolean),
+        evap_temp: s('evaporating_temp'),
+        cond_temp: s('condensing_temp'),
+        hot_gas: s('gas_discharge_temp'),
+        suction_temp: s('gas_return_temp'),
+        low_pressure: s('ou_evaporator_pressure'),
+        high_pressure: s('ou_condenser_pressure'),
+        eev: s('eev_step'),
+      };
+    },
+    tiles: (p, i, ctx) => {
+      const s = (tk) => ctx.key('airahome', 'sensor', tk);
+      return {
+        energy: { total: [s('electricity_kwh'), s('electricity_wh')].filter(Boolean) },
+        heat: { total: [s('heat_kwh'), s('heat_wh')].filter(Boolean) },
+      };
+    },
+    // Alarms is a problem sensor (critical and error severities): on is an error.
+    errors: (p, i, ctx) => [ctx.key('airahome', 'binary_sensor', 'alarms')].filter(Boolean),
+    // Raw states of hp_active_state (PUMP_ACTIVE_STATE_ without the prefix, lower case); anti-legionella is a hot-water run.
+    mode_map: { idle: 'idle', heating: 'heating', cooling: 'cooling', dhw: 'dhw', anti_legionella: 'dhw', defrosting: 'defrost', unspecified: 'idle' },
+    hc_mode_map: { idle: 'idle', heating: 'heating', cooling: 'cooling', heating_cooling: 'heating', unspecified: 'idle' },
+    program_map: { on: 'holiday', off: 'none' },
+  },
+
   // Kronoterm (ADAPT, ETERA, VERSI, WPLV …) via the "Kronoterm" integration (HACS), Cloud API or Modbus. Entities are
   // found by translation_key, so entity ids and the HA language do not matter. Cloud and Modbus name the circuit
   // temperatures differently (loop_1_inlet_temperature, loop_1_temp); both spellings are candidates.

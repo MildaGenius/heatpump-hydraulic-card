@@ -20,6 +20,7 @@ What you get:
 - compressor phase, with DHW recognised via "DHW charging" (or from the flow temperature, see below)
 - compressor running and circulation pump
 - COP heating and DHW, energy today, compressor starts
+- from Home Assistant 2026.12, where the device reports it: the heat output and the heat for heating and hot water today (see Notes)
 - details: compressor hours and starts, heater rod hours, compressor modulation, inlet/outlet temperatures and pressures, liquid line, subcooling and superheat
 
 ## Hot water without a charging signal
@@ -44,4 +45,6 @@ With a buffer, with several circuits or with your own `hc_pump` in the configura
 
 ## Notes
 
-ViCare has no live electrical power, so add `power` from a meter if you have one; the heat output is estimated from flow rate × spread. For a Vitocal with a ground source, set `source_type: brine`: the primary circuit supply and return become brine in and out. Circuits 2 and 3 share the same translation keys in ViCare, so map their entities manually (`hc2_flow`, …).
+ViCare has no live electrical power, so add `power` from a meter if you have one.
+
+Heat output: Home Assistant 2026.12 adds the heat production sensors ([core #192458](https://github.com/home-assistant/core/pull/192458), merged into dev on 14 Nov 2026): `heat_production_current` (kW, PyViCare `getHeatProductionCurrent`), `heat_production_heating_today` and `heat_production_dhw_today` (kWh, the current day of the heat production summary). The preset maps them as `heat` and as the tiles heat for heating and heat for hot water, today. ViCare creates them only where the device reports these values. Without them, on older Home Assistant versions or devices without the feature, the heat output is estimated from flow rate × spread. For a Vitocal with a ground source, set `source_type: brine`: the primary circuit supply and return become brine in and out. Circuits 2 and 3 share the same translation keys in ViCare, so map their entities manually (`hc2_flow`, …).

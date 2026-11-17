@@ -428,6 +428,8 @@ const HFC_PRESETS = {
         flow: s('secondary_circuit_supply_temperature', 'supply_temperature'),
         return: s('secondary_circuit_return_temperature', 'return_temperature'),
         volume: s('volumetric_flow'),
+        // Live heat output, HA 2026.12 (core #192458); without it the card estimates heat from flow rate and spread.
+        heat: s('heat_production_current'),
         source_in: s('primary_circuit_supply_temperature'),
         source_out: s('primary_circuit_return_temperature'),
         outdoor: s('outside_temperature'),
@@ -467,6 +469,7 @@ const HFC_PRESETS = {
         energy_heating: { ...per('energy_summary_consumption_heating_', summary), year: [s('energy_summary_consumption_heating_currentyear'), s('energy_consumption_heating_this_year')] },
         energy_dhw: { ...per('energy_dhw_summary_consumption_heating_', summary), year: [s('energy_dhw_summary_consumption_heating_currentyear'), s('energy_consumption_dhw_this_year')] },
         energy_cooling: per('energy_consumption_cooling_', { today: 'today', month: 'this_month', year: 'this_year' }),
+        heat_heating: { today: s('heat_production_heating_today') }, heat_dhw: { today: s('heat_production_dhw_today') },
         starts: { total: s('compressor_starts') }, hours: { total: s('compressor_hours') },
         ...Object.fromEntries([1, 2, 3, 4, 5].map((n) => [`load_class${n}`, { total: s(`compressor_hours_loadclass${n}`) }])),
         aux_hours: { total: s('heating_rod_hours') }, aux_starts: { total: s('heating_rod_starts') },
@@ -1116,6 +1119,9 @@ const HFC_PRESETS = {
         starts_total: s('compressor1_impulses'),
         aux_hours: s('additional_heat_generator_operation_hours'),
         heat_total: s('heat_amount_counter'),
+        // Compressor speed of inverters (calc 231, translation key pump_frequency): in Hz from the release after 2026.11.01;
+        // fixed-speed units do not get the entity.
+        compressor_speed: s('pump_frequency'),
         hot_gas: s('hot_gas_temperature'),
         suction_temp: s('suction_compressor_temperature'),
         superheat: s('overheating_temperature'),
@@ -2477,7 +2483,8 @@ const hfcMeanKey = (key) => /^(hc[2-6]_)?room(_humidity)?$/.test(key);
 // One rule for "the compressor runs", in the live view, the timeline segments and the runs: an on-word of a binary entity, or a
 // frequency, speed or load above 0. Every other text (off, standby, 0.00, -1 …) is off; unavailable and unknown are handled by the
 // caller (a gap in the timeline, the end of a run).
-const hfcCompressorOn = (s) => ['on', 'true', 'open', 'ein'].includes(String(s ?? '').trim().toLowerCase()) || parseFloat(s) > 0;
+// Running texts of compressor state enums (NIBE: STOPPED, STARTING, RUNNING, STOPPING) count as on (#253).
+const hfcCompressorOn = (s) => ['on', 'true', 'open', 'ein', 'running', 'starting'].includes(String(s ?? '').trim().toLowerCase()) || parseFloat(s) > 0;
 
 const HFC_ENTITY_GROUPS = {
   sec_hp: ['mode', 'status', 'compressor', 'fan_speed', 'defrost', 'power', 'heat', 'flow', 'return', 'volume', 'primary_pump_state', 'source_volume', 'source_in', 'source_out', 'brine_pressure', 'outdoor', 'valve', 'heater', 'pv_boost', 'sg_ready'],
@@ -7342,6 +7349,8 @@ class HeatpumpFlowCard extends HTMLElement {
       const state = this._hass.states[id]?.state;
       if (state === undefined) return false;
       const raw = String(state).trim(); const normalized = raw.toLowerCase(); const value = Number(raw);
+      // error_ok also names numeric codes that are no error (NIBE alarm 183 = defrost, #253).
+      if (this._errorOk.includes(normalized)) return false;
       if (Number.isFinite(value)) return value !== 0;
       if (normalized === 'on') return true;
       if (['unknown', 'unavailable', 'off', ''].includes(normalized)) return false;

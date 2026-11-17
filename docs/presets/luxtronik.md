@@ -36,7 +36,7 @@ What you get:
   ```
 - hot water temperature and target, solar collector and pump where installed, the additional heat generator as the backup heater
 - mixing circuits 1 to 3 as heating circuits (`hc_count`), only where they report a flow and a target; room unit temperature and target; the heating mode (party, holidays) as the program chip
-- refrigerant circuit in the details: hot gas, suction gas, superheat, high and low pressure
+- refrigerant circuit in the details: hot gas, suction gas, superheat, high and low pressure; on inverters the compressor speed
 - tiles from the kWh counters per use (heating, hot water, cooling), the heat amount, compressor hours and impulses, each as a total with the periods from long-term statistics
 
 Not mapped: the last error (it stays after a reset), the circulation pump (the integration names it ambiguously), the buffer and multifunction storage (not exposed). Add them with `entities` if you want them.
@@ -61,6 +61,7 @@ Not mapped: the last error (it stays after a reset), the circulation pump (the i
 - `program`: the select `heating_mode` (`Automatic`, `Off`, `Second heatsource`, `Party`, `Holidays`); Party and Holidays show their chip.
 - Heating circuit 1 to 3: the mixing circuits, `flow_in_circuitN_temperature` as `hc_flow` and `flow_in_circuitN_target_temperature` as `hc_setpoint`. A mixing circuit that is not installed still has both sensors, so a circuit counts only when the flow is a number and the target is 10 °C or more. Without a mixing circuit the card draws the heat pump flow as the circuit flow (direct circuit). `hc_pump` (circuit 1): `circulation_pump_heating`. `room` / `room_target` (circuit 1): `room_thermostat_temperature` and its target.
 - Details: `compressor1_operation_hours` (else `operation_hours`), `compressor1_impulses`, `heat_amount_counter` as `heat_total`, refrigerant circuit (`hot_gas_temperature`, `suction_compressor_temperature`, `overheating_temperature`, `high_pressure`, `low_pressure`).
+- `compressor_speed`: `pump_frequency`. Despite its name this is the compressor speed: calculation 231 `ID_WEB_Freq_VD` (VD = Verdichter, compressor). The integration renamed it to "Compressor frequency" after release 2026.11.01 ([BenPru/luxtronik 44a3c21](https://github.com/BenPru/luxtronik/commit/44a3c21b5b375600551f8ee6f84aa361c0db01a5), upstream #863). From that change it reads Hz on every inverter (air-source inverters report rpm, which the integration divides by 60), is enabled by default and exists only on inverters (calculation 238, the maximum frequency, above 0). Up to 2026.11.01 the entity is disabled by default; enabled on an air-source inverter, it reads rpm under a Hz unit, so the details show rpm and the compressor turns at full speed. Fixed-speed units have no such entity; the animation then runs at full speed while the compressor is on.
 - Tiles (total counters, periods from long-term statistics): electricity per use `heat_energy_input`, `dhw_energy_input`, `cooling_energy_input`, `additional_heat_generator_energy`; heat `heat_amount_counter`, `heat_amount_heating`, `dhw_heat_amount`, `cooling_heat_amount`; compressor hours and impulses. The per-use counters exist on newer firmware only.
 
 ## Deliberately not mapped
@@ -69,7 +70,6 @@ Not mapped: the last error (it stays after a reset), the circulation pump (the i
 - `circulation`: the integration names the outputs BUP/ZIP `dhw_recirculation_pump`, `dhw_circulation_pump` and `dhw_charging_pump` (the last two share one register); which of them is the circulation pump depends on the installation.
 - `valve`: no entity reports the diverter valve; hot water comes from the status.
 - Buffer and multifunction storage (MFS): the integration exposes no buffer sensors except the solar buffer.
-- `compressor_speed`: the controller has no compressor frequency (`pump_frequency` is the circulation pump). The animation runs at full speed while the compressor is on.
 - `source_type`: the controller does not tell the heat source. Set `source_type: brine` or `water` for ground and water heat pumps.
 - Circuits 4 to 6: the controller has three mixing circuits.
 

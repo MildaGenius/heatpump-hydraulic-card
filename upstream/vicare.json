@@ -1,12 +1,11 @@
 {
   "preset": "vicare",
   "reviewed": {
-    "date": "2026-11-10",
+    "date": "2026-11-17",
     "version": null,
-    "note": "HA dev to 86f7b2b checked: heating rod runtime sensors, an operating mode select per heating circuit, room window and condensation risk binary sensors (one device per room). Additions only; heating rod runtime is a candidate for aux_hours, condensation_risk for the dew-point warning of #251."
+    "note": "HA dev to c44bb0c checked: heat production sensors (heat_production_current, heat_production_heating_today, heat_production_dhw_today, core #192458) now mapped as heat and the heat tiles for today; renamed PyViCare program temperature getters (internal), battery states and Vitoset water softener sensors. No key the preset uses changed."
   },
   "unmapped": {
-    "heat": "ViCare reports no live heat output, only consumption and production counters; the card estimates it from flow rate and spread.",
     "hc_return": "ViCare has no return temperature per heating circuit; return_temperature belongs to the heat generator.",
     "room": "Room temperatures come from ViCare room controls, one device per room without a translation key, so there is no unambiguous room per circuit."
   },

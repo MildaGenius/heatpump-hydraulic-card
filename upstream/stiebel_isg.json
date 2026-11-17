@@ -1,9 +1,9 @@
 {
   "preset": "stiebel_isg",
   "reviewed": {
-    "date": "2026-11-10",
+    "date": "2026-11-17",
     "version": "2026.11",
-    "note": "2026.11 checked: LWZ compressor speed in whole Hz, ventilation entities limited to LWZ_R290 and added later, WPM ventilation sensors and stage numbers, opt-in estimated COP. Additions only; the keys the preset uses are unchanged."
+    "note": "main to 3094dfc checked: temperature numbers get a device class (unit conversion on Fahrenheit instances), LWZ fan level rejects fractions. Entity ids and keys unchanged."
   },
   "unmapped": {
     "heat": "The ISG reports produced heat only as daily and total counters, no live heat output; the card estimates it from flow rate and spread.",

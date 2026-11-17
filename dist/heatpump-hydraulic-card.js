@@ -1491,6 +1491,60 @@ const HFC_PRESETS = {
       };
     },
   },
+
+  // NIBE F series (F370/F470/F730/F750 exhaust air, F1145/F1155/F1245/F1255 brine) through the core integration "NIBE Heat Pump"
+  // (domain nibe_heatpump, local Modbus or NIBE gateway, #253). The integration sets each entity id from the coil name of the nibe
+  // library (`bt1-outdoor-temperature-40004` → sensor.bt1_outdoor_temperature_40004): English in every language, the register at
+  // the end. The S series uses other registers under the same numbers (40012 is degree minutes there), so the preset matches the
+  // whole coil name, never the number alone. Built from the F470 installation of #253 and the library's model files (nibe 2.26).
+  nibe: {
+    name: 'NIBE F series (NIBE Heat Pump)',
+    // The heating medium pump GP1 (supply pump EP14) belongs to the heat pump and runs for hot water, too.
+    primary_pump: true,
+    auto_circuits: false,
+    // BT16 sits on the evaporator surface and BT17 on the suction line; neither is a saturation temperature, so no derived superheat.
+    refrigerant_derived: false,
+    // The priority and the compressor state together; both are coils of every F model in the library and of no S model.
+    detect: (ctx) => {
+      const c = (domain, name) => ctx.match(new RegExp(`^${domain}\\.${name}(?:_\\d+)?$`), 'nibe_heatpump');
+      return c('sensor', 'prio_43086') && c('sensor', 'compressor_state_ep14_43427') ? '' : undefined;
+    },
+    entities: (p, i, ctx) => {
+      // A second heat pump of the same model gets the coil name with _2 at the end.
+      const s = (...names) => names.map((name) => ctx.match(new RegExp(`^sensor\\.${name}(?:_\\d+)?$`), 'nibe_heatpump')).filter(Boolean);
+      // Without a room sensor BT50 exists but reads unknown; the circuit then has no room.
+      const room = s('bt50_room_temp_s1_40033').filter((id) => Number.isFinite(parseFloat(ctx.state(id))));
+      return {
+        // Prio says what the compressor works for; the compressor state whether it runs (STARTING and RUNNING are on).
+        mode: s('prio_43086'),
+        compressor: s('compressor_state_ep14_43427'),
+        primary_pump_state: s('supply_pump_state_ep14_43431'),
+        // Inverters only (F750, F1155, F1255): fixed-speed units such as the F470 have no such coil.
+        compressor_speed: s('compressor_frequency_actual_43136'),
+        flow: s('bt2_supply_temp_s1_40008'),
+        return: s('eb100_ep14_bt3_return_temp_40012'),
+        outdoor: s('bt1_outdoor_temperature_40004'),
+        // Brine in and out on F1145 to F1255; exhaust air and vented air on the exhaust air models.
+        source_in: s('eb100_ep14_bt10_brine_in_temp_40015', 'bt20_exhaust_air_temp_1_40025'),
+        source_out: s('eb100_ep14_bt11_brine_out_temp_40016', 'bt21_vented_air_temp_1_40026'),
+        // The internal electric addition heats the heating medium; its power in kW is above 0 while it runs.
+        heater: s('int_el_add_power_43084'),
+        dhw_top: s('bt7_hw_top_40013'),
+        dhw_bottom: s('bt6_hw_load_40014'),
+        hc_setpoint: i.hc === 1 ? s('calc_supply_s1_43009') : undefined,
+        room: i.hc === 1 && room.length ? room : undefined,
+        program: [ctx.match(/^select\.holiday_activated_48043(?:_\d+)?$/, 'nibe_heatpump')].filter(Boolean),
+        evap_temp: s('eb100_bt16_evaporator_temp_40020'),
+        suction_temp: s('eb100_ep14_bt17_suction_40022'),
+      };
+    },
+    errors: (p, i, ctx) => [ctx.match(/^sensor\.alarm_45001(?:_\d+)?$/, 'nibe_heatpump')].filter(Boolean),
+    // Alarm 0 is none; 183 is "defrosting in progress", an information, not a fault (#253).
+    error_ok: ['183'],
+    // Prio (coil 43086). TRANSFER stays unmapped until it is known what the unit does then (#253).
+    mode_map: { OFF: 'idle', HEAT: 'heating', 'HOT WATER': 'dhw', POOL: 'heating', 'POOL 2': 'heating', COOLING: 'cooling' },
+    program_map: { ACTIVE: 'holiday', INACTIVE: 'none' },
+  },
 };
 
 /* ------------------------------------------------------------------ */

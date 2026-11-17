@@ -1420,6 +1420,100 @@ const HFC_PRESETS = {
     },
   },
 
+  // Samsung EHS over the F1/F2 bus with the HACS integration "EHS Sentinel" by echoDaveD (domain ehs_sentinel, RS485 bridge, #403).
+  // Each entity is named after its NASA message: the prefix (ENUM_, LVAR_, NASA_, VAR_) dropped, camel case, so
+  // NASA_INDOOR_WATER_OUT_TEMP becomes indoorWaterOutTemp and sensor.<device>_indoorwaterouttemp. The device is the instance
+  // name ("Samsung EHSSentinel" → samsung_ehssentinel). The names stay English in every language. With write mode on, writable
+  // messages become number, switch or select entities instead of sensors.
+  ehs_sentinel: {
+    name: 'Samsung EHS (EHS Sentinel)',
+    unit_style: 'samsung',
+    // The primary water pump (0x4089) runs for hot water, too.
+    primary_pump: true,
+    auto_circuits: false,
+    // The outdoor unit draws about 250 W while the compressor is off (#403); the compressor status tells running.
+    power_threshold: 300,
+    // The room sensor counts only while it reports a temperature, and the bus delivers values only when they are polled: the card
+    // looks again every minute, so a room reading that arrives late still appears (Codex review).
+    dynamic: true,
+    // The flow temperature and the compressor status together, both on platform ehs_sentinel.
+    detect: (ctx) => {
+      const re = /^sensor\.(.+)_indoorwaterouttemp$/;
+      const id = ctx.match(re, 'ehs_sentinel');
+      const p = id && id.match(re)[1];
+      return p && ctx.ids.includes(`binary_sensor.${p}_outdoorcomp1status`) ? p : undefined;
+    },
+    entities: (p, i, ctx) => {
+      const s = (...ks) => ks.map((k) => `sensor.${p}_${k}`);
+      const b = (...ks) => ks.map((k) => `binary_sensor.${p}_${k}`);
+      // Writable messages: number (write mode) or sensor.
+      const w = (k) => [`number.${p}_${k}`, `sensor.${p}_${k}`];
+      // The room sensor of the controller (0x4203) reads -50 when none is fitted.
+      const room = s('currenttemp').filter((id) => parseFloat(ctx.state(id)) > -40);
+      return {
+        compressor: b('outdoorcomp1status'),
+        compressor_speed: s('outdoorcomp1runhz'),
+        defrost: b('indoordefroststatus'),
+        // 0x4067: ROOM or TANK.
+        valve: s('dhwvalve'),
+        // Backup heater 0x406C: OFF, STEP 1, STEP 2.
+        heater: s('inbackupheater'),
+        dhw_heater: b('inboosterheater'),
+        primary_pump_state: b('instatewaterpump'),
+        // 0x8413 as kW; the heat output is the integration's own value from flow rate and spread (W).
+        power: s('outdoorcontrolwattmeterallunit'),
+        heat: s('ehssentinelheatoutput'),
+        flow: s('indoorwaterouttemp'),
+        return: s('indoorwaterintemp'),
+        volume: s('inflowsensorcalc'),
+        outdoor: s('outdoorouttemp'),
+        fan_speed: s('outdoorfanrpm1'),
+        dhw_top: s('indoordhwcurrenttemp'),
+        dhw_target: w('indoordhwsettemp'),
+        // The integration's current target flow (0x9995), else the zone 1 water outlet target (0x4247).
+        hc_setpoint: i.hc === 1 ? [...s('ehssentinelcurrenttargetflowtemp'), ...w('indoorsettempwaterout')] : undefined,
+        room: i.hc === 1 && room.length ? room : undefined,
+        // Outing mode (0x406D) as a binary sensor, or a switch in write mode.
+        program: [`switch.${p}_indooroutgoing`, `binary_sensor.${p}_indooroutgoing`],
+        energy_today: s('ehssentineldailyconsumedpower'),
+        energy_total: s('outdoorcontrolwattmeterallunitaccum'),
+        heat_total: s('intotalgeneratedpower'),
+        starts_total: s('ehssentinelstartcounter'),
+        cop_heating_today: s('ehssentineldailycopheatmode'),
+        cop_dhw_today: s('ehssentineldailycopdhwmode'),
+        hot_gas: s('outdoordischargetemp1'),
+        suction_temp: s('outdoorsuction1temp'),
+        // Saturation temperatures at low and high pressure (0x82A0, 0x829F).
+        evap_temp: s('outdoorlowpresstemp'),
+        cond_temp: s('outdoorhighpresstemp'),
+        low_pressure: s('outdoorlowpress'),
+        high_pressure: s('outdoorhighpress'),
+        eev: s('outdoormaineev1'),
+      };
+    },
+    // 0x8235: 0 is no error, any other number a fault code.
+    errors: (p) => [`sensor.${p}_outerrorcode`],
+    valve_map: { ROOM: 'heating', TANK: 'dhw' },
+    program_map: { on: 'holiday', off: 'none' },
+    // The integration's own day and lifetime counters; per mode for heating and hot water.
+    tiles: (p) => {
+      const s = (...ks) => ks.map((k) => `sensor.${p}_${k}`);
+      return {
+        energy: { today: s('ehssentineldailyconsumedpower'), total: s('outdoorcontrolwattmeterallunitaccum') },
+        heat: { today: s('ehssentineldailygeneratedpower'), total: s('intotalgeneratedpower') },
+        energy_heating: { today: s('ehssentineldailyconsumedpowerheatmode'), total: s('ehssentineltotalconsumedpowerheatmode') },
+        energy_dhw: { today: s('ehssentineldailyconsumedpowerdhwmode'), total: s('ehssentineltotalconsumedpowerdhwmode') },
+        heat_heating: { today: s('ehssentineldailygeneratedpowerheatmode'), total: s('ehssentineltotalgeneratedpowerheatmode') },
+        heat_dhw: { today: s('ehssentineldailygeneratedpowerdhwmode'), total: s('ehssentineltotalgeneratedpowerdhwmode') },
+        cop_total: { today: s('ehssentineldailycop'), total: s('ehssentineltotalcop') },
+        cop_heating: { today: s('ehssentineldailycopheatmode'), total: s('ehssentineltotalcopheatmode') },
+        cop_dhw: { today: s('ehssentineldailycopdhwmode'), total: s('ehssentineltotalcopdhwmode') },
+        starts: { total: s('ehssentinelstartcounter') },
+        defrosts: { total: s('ehssentineldefrostcounter') },
+      };
+    },
+  },
+
   // Daikin Altherma / ROTEX through ESPAltherma (ESP32 on the X10A port, MQTT device discovery, beta branch, #254). Every value of
   // the model definition becomes <prefix>_<label>: the label lowercased, letters and digits only, spaces as underscores. The labels
   // stay English in every language and are the same in the Altherma 3, LT, EPRA, ERGA and EBLA definitions. The prefix is the
@@ -3318,7 +3412,8 @@ class HeatpumpFlowCard extends HTMLElement {
     this._hcCount = hfcHcCount(config);
     this._hcTypes = [this._hcType, ...[2, 3, 4, 5, 6].map((n) => config[`hc${n}_type`] || 'underfloor')];
     this._sourceType = config.source_type || 'air';
-    this._threshold = Number.isFinite(+config.power_threshold) && config.power_threshold !== '' && config.power_threshold !== undefined ? +config.power_threshold : 100;
+    // A preset may raise the default for units with a high standby draw (Samsung EHS Sentinel, #403); the configuration wins.
+    this._threshold = Number.isFinite(+config.power_threshold) && config.power_threshold !== '' && config.power_threshold !== undefined ? +config.power_threshold : (preset?.power_threshold ?? 100);
     this._needsBuild = true;
     this._lastTry = 0;
     this._rendered = false;
@@ -3670,7 +3765,7 @@ class HeatpumpFlowCard extends HTMLElement {
       `Layout: ${config.layout || 'default'}`,
       // Where runs and the running state come from (#365).
       `Runs from: ${(() => {
-        const threshold = Number.isFinite(+config.power_threshold) && config.power_threshold !== '' && config.power_threshold !== undefined && config.power_threshold !== null ? +config.power_threshold : 100;
+        const threshold = Number.isFinite(+config.power_threshold) && config.power_threshold !== '' && config.power_threshold !== undefined && config.power_threshold !== null ? +config.power_threshold : (r.preset?.power_threshold ?? 100);
         if (config.run_signal === 'units') return Array.isArray(config.units) && config.units.length ? `unit power above ${[...new Set(config.units.map((u) => `${hfcUnitRunW(u)} W`))].join(' / ')} (run_signal: units)` : 'compressor or operating mode (run_signal: units, but no units are configured)';
         if (config.run_signal === 'power') return r.entities.power ? `power above ${threshold} W (run_signal: power)` : 'compressor or operating mode (run_signal: power, but power is not mapped)';
         return 'compressor or operating mode';
@@ -4107,6 +4202,9 @@ class HeatpumpFlowCard extends HTMLElement {
     if (!this._has(key)) return 0;
     const s = String(this._s(key)).toLowerCase();
     if (['on', 'true', 'open', 'ein'].includes(s)) return 1;
+    // A stage as text: "STEP 1", "Stage 2", "Stufe 2" (Samsung backup heater 0x406C, #403).
+    const step = s.match(/^(?:step|stage|stufe)\s*(\d)$/);
+    if (step) return Math.min(+step[1], 3);
     const v = parseFloat(s);
     if (!Number.isFinite(v) || v <= 0) return 0;
     return ['w', 'kw', '%'].includes(this._unit(key)) ? 1 : Math.min(Math.round(v), 3);

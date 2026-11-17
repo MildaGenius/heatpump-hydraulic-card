@@ -4470,6 +4470,52 @@
       '#23: the diagnostic report names averaged and summed members');
   }
 
+  // 18e2. #407: defrosts and HeishaMon starts without the two restarts of each defrost, from the recorder history. The counter steps
+  // and defrost windows of 13.11.2026 from the report: 10 steps, 2 real starts, 4 defrosts.
+  {
+    const p = 'panasonic_heat_pump'; const counter = `sensor.${p}_main_operations_counter`; const df = `binary_sensor.${p}_main_defrosting_state`;
+    const T0 = Date.parse('2026-11-13T00:00:00Z'); const at = (hm, s) => { const [h, m] = hm.split(':').map(Number); return { s: String(s), lu: (T0 + (h * 60 + m) * 60000) / 1000 }; };
+    const history = {
+      [counter]: [at('00:00', 6515), at('01:09', 6516), at('08:03', 6517), at('08:57', 6518), at('09:02', 6519), at('10:34', 6520), at('10:39', 6521),
+        at('13:02', 6522), at('13:06', 6523), at('16:05', 6524), at('16:09', 6525)],
+      [df]: [at('00:00', 'off'), at('08:55', 'on'), at('09:03', 'off'), at('10:32', 'on'), at('10:41', 'off'), at('13:00', 'on'), at('13:08', 'off'), at('16:03', 'on'), at('16:11', 'off')],
+    };
+    const st = toStates({
+      [`sensor.${p}_main_main_outlet_temp`]: ['36', '°C'], [`sensor.${p}_main_main_inlet_temp`]: ['32', '°C'], [`sensor.${p}_main_compressor_freq`]: ['19', 'Hz'],
+      [counter]: { state: '6525', attributes: { state_class: 'total_increasing' } }, [df]: 'off',
+    });
+    const queries = [];
+    const hassH = (h) => ({ ...hassOf(st), callWS: (q) => { queries.push(q); return q.type === 'history/history_during_period' ? Promise.resolve(h) : Promise.reject(new Error('n/a')); } });
+    const tileVals = (c) => Object.fromEntries([...c.shadowRoot.querySelectorAll('.stat')].map((x) => [x.querySelector('.sl').textContent, x.querySelector('.sv').textContent]));
+    let card = mount({ preset: 'heishamon', tiles: ['starts:today', 'defrosts:today', 'starts:month'] }, hassH(history)); await wait(40);
+    let v = tileVals(card);
+    const hq = queries.find((q) => q.type === 'history/history_during_period');
+    check(v['Compressor starts · today'] === '2' && v['Defrosts · today'] === '4', `#407: HeishaMon starts today leave out the restarts of 4 defrosts (${JSON.stringify(v)})`);
+    check(card._tileSource('starts', 'month')?.stat === counter && !card._tileSource('defrosts', 'month'),
+      '#407: longer periods keep the raw counter; defrosts exist for the periods within the history only');
+    check(hq && hq.entity_ids.includes(df) && hq.entity_ids.includes(counter) && hq.no_attributes, `#407: one history query for the defrost entity and the counter (${JSON.stringify(hq?.entity_ids)})`);
+    card.remove();
+    // A defrost already going at midnight belongs to the day before; a counter step 30 s after a defrost still belongs to it.
+    const edge = {
+      [counter]: [at('00:00', 100), at('00:03', 101), { s: '102', lu: (T0 + (5 * 60 + 10) * 60000 + 30000) / 1000 }, at('07:00', 103)],
+      [df]: [at('00:00', 'on'), at('00:05', 'off'), at('05:00', 'on'), at('05:10', 'off'), at('06:00', 'unavailable'), at('06:01', 'on'), at('06:04', 'off')],
+    };
+    card = mount({ preset: 'heishamon', tiles: ['starts:today', 'defrosts:today'] }, hassH(edge)); await wait(40);
+    v = tileVals(card);
+    check(v['Compressor starts · today'] === '1' && v['Defrosts · today'] === '1',
+      `#407: no defrost from midnight or after unavailable, a step within ${HFC_HISTORY_COUNT.grace} s after a defrost is its restart (${JSON.stringify(v)})`);
+    card.remove();
+    // An own tile source is taken as it is; another preset counts defrosts but not its starts.
+    card = mount({ preset: 'heishamon', tiles: ['starts:today'], tile_sources: { starts: counter } }, hassH(history)); await wait(40);
+    check(card._tileSource('starts', 'today')?.stat === counter, '#407: tile_sources.starts keeps the plain counter');
+    card.remove();
+    const other = mount({ entities: { compressor: 'sensor.c', defrost: df, flow: 'sensor.f', return: 'sensor.r' }, tiles: ['defrosts:today'] },
+      { ...hassOf(toStates({ 'sensor.c': 'on', [df]: 'off', 'sensor.f': ['35', '°C'], 'sensor.r': ['30', '°C'] })), callWS: (q) => (q.type === 'history/history_during_period' ? Promise.resolve(history) : Promise.reject(new Error('n/a'))) });
+    await wait(40);
+    check(tileVals(other)['Defrosts · today'] === '4' && !other._tileSource('starts', 'today')?.history, '#407: any configuration with a defrost entity counts defrosts; only the flagged preset changes the starts');
+    other.remove();
+  }
+
   // 18f. HeishaMon: refrigerant temperatures and the superheat computed from them
   {
     const p = 'panasonic_heat_pump';

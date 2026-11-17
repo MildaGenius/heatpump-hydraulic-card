@@ -4609,6 +4609,70 @@
     const own = mount({ preset: 'heishamon', entities: { evap_temp: `sensor.${p}_main_outside_pipe_temp` } }, hassOf(toStates({ ...st, [`switch.${p}_main_defrosting_state`]: 'on' }))); await wait(20);
     check(value(own, 'evap_temp') !== '–' && value(own, 'suction_temp') === '–', 'an entity set in the config keeps its value in defrost');
     own.remove();
+    // #413: at standstill the refrigerant temperatures settle to the surroundings, so the derived superheat and subcooling show '–';
+    // a superheat the integration reports itself stays.
+    const still = { ...st, [`sensor.${p}_main_compressor_freq`]: ['0', 'Hz'] };
+    const off = mount({ preset: 'heishamon' }, hassOf(toStates(still))); await wait(20);
+    check(!off._flowModel().running && value(off, 'superheat') === '–' && /1/.test(value(off, 'evap_temp')),
+      `#413: no derived superheat while the compressor is off, the temperatures stay (${value(off, 'superheat')} / ${value(off, 'evap_temp')})`);
+    off.hass = hassOf(toStates(st)); await wait(5);
+    check(value(off, 'superheat') === '2.0 K', `#413: the derived superheat returns when the compressor runs (${value(off, 'superheat')})`);
+    off.remove();
+    const reported = mount({ preset: 'heishamon', entities: { superheat: 'sensor.own_superheat' } }, hassOf(toStates({ ...still, 'sensor.own_superheat': ['-3.1', 'K'] }))); await wait(20);
+    check(value(reported, 'superheat') === '-3.1 K', `#413: a reported superheat stays at standstill (${value(reported, 'superheat')})`);
+    reported.remove();
+  }
+  {
+    // #413: the name of an own entity in the details and in a free tile loses a leading device name, from the registry.
+    const states = toStates({
+      'sensor.flow': ['35', '°C'], 'sensor.return': ['30', '°C'],
+      'sensor.hc_pc0_flow': { state: '12', attributes: { friendly_name: 'Buderus WLW186i PC0 flow', unit_of_measurement: 'l/h' } },
+      'sensor.heater_power': { state: '0', attributes: { friendly_name: 'Heater power', unit_of_measurement: 'W' } },
+      'sensor.plain': { state: '3', attributes: { friendly_name: 'Buderus WLW186i' } },
+    });
+    const registry = { 'sensor.hc_pc0_flow': { device_id: 'd1' }, 'sensor.heater_power': { device_id: 'd2' }, 'sensor.plain': { device_id: 'd1' } };
+    const hass = { ...hassOf(states, registry), devices: { d1: { name: 'Buderus WLW186i' }, d2: { name: 'Heat' } } };
+    const card = mount({ entities: { flow: 'sensor.flow', return: 'sensor.return' }, details: ['sensor.hc_pc0_flow', 'sensor.heater_power', 'sensor.plain'],
+      tiles: [{ entity: 'sensor.hc_pc0_flow' }] }, hass); await wait(20);
+    const more = card._drawerRows().flatMap(([, list]) => list).filter((x) => /^x\d$/.test(x[0])).map((x) => x[1]);
+    check(more.join('|') === 'PC0 flow|Heater power|Buderus WLW186i', `#413: device name dropped at a word boundary only, a name of the device alone stays (${more.join('|')})`);
+    const tile = card.shadowRoot.querySelector('.stat .sl')?.textContent;
+    check(tile === 'PC0 flow', `#413: a free tile uses the short name as well (${tile})`);
+    card.hass = { ...hass, devices: { d1: { name: 'Buderus WLW186i', name_by_user: 'Heat pump' } } }; await wait(5);
+    check(card._entityName('sensor.hc_pc0_flow') === 'Buderus WLW186i PC0 flow', 'the name the user gave the device is the one that counts');
+    card.remove();
+  }
+  {
+    // #413: a preset's default tiles replace the default row while `tiles` is not set; `tiles` and an empty list still win.
+    const s = setups[0];
+    const states = toStates(s.states('heat'));
+    const saved = HFC_PRESETS.lambda.default_tiles;
+    HFC_PRESETS.lambda.default_tiles = ['spread', 'volume'];
+    const labels = (c) => [...c.shadowRoot.querySelectorAll('.stat .sl')].map((x) => x.textContent);
+    const base = { ...s.config }; delete base.tiles;
+    let card = mount(base, hassOf(states)); await wait(20);
+    const def = labels(card);
+    card.remove();
+    card = mount({ ...base, tiles: ['outdoor'] }, hassOf(states)); await wait(20);
+    const own = labels(card);
+    card.remove();
+    card = mount({ ...base, tiles: [] }, hassOf(states)); await wait(20);
+    const none = card.shadowRoot.getElementById('stats').style.display;
+    card.remove();
+    const opts = C._tileOptions({ preset: 'lambda', ...base }, C._resolve({ preset: 'lambda', ...base }, hassOf(states)), hassOf(states));
+    if (saved === undefined) delete HFC_PRESETS.lambda.default_tiles; else HFC_PRESETS.lambda.default_tiles = saved;
+    check(def.length === 2 && !def.some((l) => /COP/.test(l)), `#413: default tiles of the preset instead of the default row (${def.join(', ')})`);
+    check(own.length === 1 && none === 'none', `#413: own tiles and an empty list still win (${own.join(', ')} / ${none})`);
+    check(opts.defaults.join() === 'spread,volume', `#413: the editor starts the own selection from the preset's default tiles (${opts.defaults.join()})`);
+    const bad = Object.entries(HFC_PRESETS).flatMap(([name, p]) => (p.default_tiles || []).map((t) => [name, C._tileSpec(t)]).filter(([, t]) => !HFC_TILES[t?.key]).map(([name, t]) => `${name}:${t?.key}`));
+    check(!bad.length && Array.isArray(HFC_PRESETS.bosch_buderus_heating.default_tiles), `#413: every default tile of a preset is a catalog tile, Bosch/Buderus has them (${bad.join(', ') || 'ok'})`);
+    // The demo "Bosch/Buderus Home Comfort" without its `tiles`: catalog tiles from the gateway's totals, not only spread and flow rate.
+    const hc = setups.find((x) => x.name === 'Bosch/Buderus Home Comfort');
+    const hcConfig = { ...hc.config }; delete hcConfig.tiles;
+    const bosch = mount(hcConfig, hassOf(toStates(hc.states('heat')), hc.registry || {}, hc.energy, hc)); await wait(60);
+    const bl = labels(bosch);
+    bosch.remove();
+    check(bl.length > 2 && bl.some((l) => /Electricity/.test(l)) && !bl.some((l) => /COP heating/.test(l)), `#413: Home Comfort shows its default catalog tiles (${bl.join(', ')})`);
   }
 
   // 18k. heating curve shift: target, curve and shift above the circuit pump, the flow temperature below it (HeishaMon heat request)

@@ -240,6 +240,9 @@ const HFC_PRESETS = {
       };
     },
     errors: (p, i, ctx) => [hfcPointT(ctx)?.find('binary_sensor', 'system_fault')].filter(Boolean),
+    // The gateway reports totals only, so the default row (COP and energy of today from own entities) stays empty except for spread
+    // and flow rate (#413). Without `tiles` the card shows these catalog tiles instead; the periods come from the statistics.
+    default_tiles: ['cop_total:today', 'energy:today', 'heat:today', 'starts:today', 'spread', 'volume'],
     tiles: (p, i, ctx) => {
       const pointt = hfcPointT(ctx); if (!pointt) return {};
       const t = (...keys) => ({ total: pointt.find('sensor', ...keys) });
@@ -4761,8 +4764,11 @@ class HeatpumpFlowCard extends HTMLElement {
       return valueOf(s.key, s.period);
     }).filter(Boolean);
     value.forEach((v) => { if (!options.some((o) => o.value === v)) options.push({ value: v, label: v }); });
-    const defaults = ['cop_heating', 'cop_dhw', 'energy', 'starts', 'spread', 'volume', 'heat_estimated']
-      .filter((k) => periodsOf[k].length).map((k) => valueOf(k));
+    // Switching the own selection on starts from the preset's default tiles (#413), else from the default row.
+    const presetDefaults = HFC_PRESETS[config.preset]?.default_tiles;
+    const defaults = Array.isArray(presetDefaults)
+      ? presetDefaults.map((t) => HeatpumpFlowCard._tileSpec(t)).filter((s) => s?.key && periodsOf[s.key]?.length).map((s) => valueOf(s.key, s.period))
+      : ['cop_heating', 'cop_dhw', 'energy', 'starts', 'spread', 'volume', 'heat_estimated'].filter((k) => periodsOf[k].length).map((k) => valueOf(k));
     return { options, value, editable, defaults };
   }
 
@@ -5085,16 +5091,22 @@ class HeatpumpFlowCard extends HTMLElement {
     }
   }
 
-  // Tiles from the `tiles` option, in the configured order: catalog keys (with period) and free entities.
+  // The tile list: `tiles` of the configuration, else the preset's `default_tiles` (#413), else null for the default row.
+  _tileList() {
+    if (Array.isArray(this._config.tiles)) return this._config.tiles;
+    return Array.isArray(this._preset?.default_tiles) ? this._preset.default_tiles : null;
+  }
+
+  // Tiles from the `tiles` option (or the preset's default tiles), in their order: catalog keys (with period) and free entities.
   _catalogTiles(L) {
     const i = this._i; const out = [];
-    this._config.tiles.forEach((raw) => {
+    this._tileList().forEach((raw) => {
       const spec = HeatpumpFlowCard._tileSpec(raw);
       if (!spec) return;
       const def = HFC_TILES[spec.key];
       if (!def) {
         const st = spec.entity && this._hass.states[spec.entity];
-        if (st) out.push([spec.name || st.attributes.friendly_name || spec.entity, this._fmtState(null, spec), spec.entity, spec]);
+        if (st) out.push([spec.name || this._entityName(spec.entity), this._fmtState(null, spec), spec.entity, spec]);
         return;
       }
       if (def.live) {
@@ -5144,13 +5156,18 @@ class HeatpumpFlowCard extends HTMLElement {
     const hydraulic = [['brine_pressure', i.brine_pressure], ['hc_pressure', i.hc_pressure]].filter(([key]) => ok(key))
       .map(([key, label]) => [key, label, this._e[key], () => this._pressureText(key)]);
     // Superheat = suction gas − evaporation, subcooling = condensation − liquid line, unless the integration provides them or the
-    // preset's pipe sensors do not allow it (`refrigerant_derived: false`).
-    const diff = (a, b) => { const v = this._n(a) - this._n(b); return Number.isFinite(v) && !reversed(a) && !reversed(b) ? `${this._fmt(v, 1)} K` : '–'; };
+    // preset's pipe sensors do not allow it (`refrigerant_derived: false`). At standstill the refrigerant temperatures settle to the
+    // surroundings and their differences mean nothing (a negative subcooling, #413): '–' until the heat pump runs. Values the
+    // integration reports itself stay as reported.
+    const diff = (a, b) => {
+      const v = this._n(a) - this._n(b);
+      return Number.isFinite(v) && this._runningNow !== false && !reversed(a) && !reversed(b) ? `${this._fmt(v, 1)} K` : '–';
+    };
     const derive = this._preset?.refrigerant_derived !== false;
     rf.push(row('superheat') || (derive && ok('suction_temp') && ok('evap_temp') ? ['superheat', D.superheat, this._e.suction_temp, () => diff('suction_temp', 'evap_temp')] : null));
     rf.push(row('subcooling') || (derive && ok('cond_temp') && ok('liquid_temp') ? ['subcooling', D.subcooling, this._e.liquid_temp, () => diff('cond_temp', 'liquid_temp')] : null));
     const more = (this._details || []).map((d, n) => (typeof d === 'string' ? { entity: d } : d)).filter((d) => d && this._hass.states[d.entity])
-      .map((d, n) => [`x${n}`, d.name || this._hass.states[d.entity].attributes.friendly_name || d.entity, d.entity, () => this._fmtState(null, d)]);
+      .map((d, n) => [`x${n}`, d.name || this._entityName(d.entity), d.entity, () => this._fmtState(null, d)]);
     // Units of a cascade (#173): power → heat and COP of each unit; "heat not current" while its heat value is too old to pair.
     const units = (this._units() || []).map((u) => [`unit${u.n}`, u.name, u.entity, () => {
       const cur = this._units()?.[u.n - 1];
@@ -5160,6 +5177,19 @@ class HeatpumpFlowCard extends HTMLElement {
       return cur.fresh ? `${w} → ${this._fmt(cur.heat, 1)} kW${Number.isFinite(cur.cop) ? ` · COP ${this._fmt(cur.cop, 1)}` : ''}` : `${w} · ${i.unit_stale}`;
     }]);
     return [[i.sec_operation, op.filter(Boolean)], [i.sec_units, units], [i.sec_hydraulic, hydraulic], [i.sec_refrigerant, rf.filter(Boolean)], [i.sec_cutouts, cutouts], [i.sec_more, more]].filter(([, r]) => r.length);
+  }
+
+  // The name of an own entity in the details and in a free tile: the friendly name without a leading device name (#413). Home
+  // Assistant puts the device name in front of the entity's own name; the card already stands for the device. From the registry,
+  // not by text: only when the entity belongs to a device whose name (or the name the user gave it) starts the friendly name.
+  _entityName(id) {
+    const full = this._hass.states[id]?.attributes?.friendly_name || id;
+    const device = this._hass.devices?.[this._hass.entities?.[id]?.device_id];
+    const prefix = String(device?.name_by_user || device?.name || '').trim();
+    // The device name must end at a word boundary: a device "Heat" does not shorten "Heater power".
+    if (!prefix || !full.startsWith(prefix) || !/[\s:·\-–]/.test(full.charAt(prefix.length))) return full;
+    const rest = full.slice(prefix.length).replace(/^[\s:·\-–]+/, '');
+    return rest || full;
   }
 
   // Event counter: a whole number followed by "×"; text states stay as they are.
@@ -7091,6 +7121,8 @@ class HeatpumpFlowCard extends HTMLElement {
     const P = this._parts;
     const F = this._flowModel();
     const { rawMode, status, hp, dhwMode, bufMode, power, vol, running, boilerRunning, generatorMode, defrost, cooling, valveDhw, toDhw, toHeat, loop, flowLoop, bypass } = F;
+    // The details derive superheat and subcooling only while the heat pump runs (#413).
+    this._runningNow = running;
     const tFlow = this._n('flow'); const tRet = this._n('return');
     const tBoiler = this._n('boiler_flow');
     const tCommonFlow = boilerRunning && Number.isFinite(tBoiler) ? tBoiler : tFlow;
@@ -7490,9 +7522,9 @@ class HeatpumpFlowCard extends HTMLElement {
     err.classList.toggle('on', errs.length > 0);
     if (errs.length) err.dataset.entity = errs[0];
 
-    // statistics: the tile catalog when `tiles` is set, otherwise the default tiles
+    // statistics: the tile catalog when `tiles` is set or the preset has default tiles, otherwise the default row
     const share = this._n('pv_share_today');
-    const custom = Array.isArray(this._config.tiles);
+    const custom = !!this._tileList();
     const tiles = custom ? this._catalogTiles({ loop, flowLoop, spread, vol, heat, heatEstimated, power: hpPower, cop, circuits: F.circuits }) : [];
     const add = (key, label, value) => { if (!custom && this._has(key)) tiles.push([this._statLabel(key, label), value, this._e[key]]); };
     add('cop_heating_today', i.stat_cop_heating, this._fmt(this._n('cop_heating_today'), 2));
@@ -7506,7 +7538,7 @@ class HeatpumpFlowCard extends HTMLElement {
       const st = this._hass.states[s.entity]; if (!st) return;
       const v = parseFloat(st.state);
       const unit = s.unit ?? st.attributes.unit_of_measurement ?? '';
-      tiles.push([s.name || st.attributes.friendly_name || s.entity, Number.isFinite(v) ? `${this._fmt(v, s.decimals ?? 1)} ${unit}`.trim() : st.state, s.entity, s]);
+      tiles.push([s.name || this._entityName(s.entity), Number.isFinite(v) ? `${this._fmt(v, s.decimals ?? 1)} ${unit}`.trim() : st.state, s.entity, s]);
     });
     // Actions per tile (default: more-info of the tile's entity).
     this._tileActs = tiles.map(([, , id, s]) => ({ entity: id, ...Object.fromEntries(HFC_ACTIONS.filter((a) => s && s[a]).map((a) => [a, s[a]])) }));

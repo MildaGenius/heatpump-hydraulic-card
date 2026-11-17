@@ -663,6 +663,21 @@
     check(fmt(phase) === 'heat:10-30:s1 dhw:40-50:s2:p10' && phase.every((r) => r.source === 'phase'), `without a compressor the runs are phases (${fmt(phase)})`);
     const unrecorded = runsOf({ 'sensor.m': h([[0, 'idle'], [10, 'heating'], [30, 'idle']]) }, ids, 0, 60);
     check(fmt(unrecorded) === 'heat:10-30:s1' && unrecorded[0].source === 'phase', `a compressor without recorded history leaves the mode phases (${fmt(unrecorded)})`);
+    // #173: the hot-water flag ends about 30 s before the compressor has ramped down. The heating piece of 30 s after the charge, and
+    // one of 4 s before it, fold into the charge; a heating period of a minute or more stays its own, and so does an ongoing one.
+    const S = 1000;
+    const piece = (pairs, c, s, e) => card._timelineRuns({ 'sensor.m': pairs.map(([t, x]) => ({ t, s: x })), 'sensor.c': c.map(([t, x]) => ({ t, s: x })) }, ids,
+      card._timelineSegments({ 'sensor.m': pairs.map(([t, x]) => ({ t, s: x })), 'sensor.c': c.map(([t, x]) => ({ t, s: x })) }, ids, s, e), s, e);
+    const tail = piece([[0, 'idle'], [10 * M, 'dhw'], [40 * M, 'heating'], [40 * M + 30 * S, 'idle']], [[0, '0'], [10 * M, '40'], [40 * M + 30 * S, '0']], 0, 60 * M);
+    check(fmt(tail) === 'dhw:10-40.5:s1', `#173: a heating piece of 30 s after a charge is part of the charge (${fmt(tail)})`);
+    const head = piece([[0, 'idle'], [10 * M, 'heating'], [10 * M + 4 * S, 'dhw'], [40 * M, 'idle']], [[0, '0'], [10 * M, '40'], [40 * M, '0']], 0, 60 * M);
+    check(fmt(head) === 'dhw:10-40:s1', `#173: a heating piece of 4 s before a charge is part of the charge (${fmt(head)})`);
+    const inner = piece([[0, 'heating'], [20 * M, 'dhw'], [20 * M + 20 * S, 'heating'], [50 * M, 'idle']], [[0, '40'], [50 * M, '0']], 0, 60 * M);
+    check(fmt(inner) === 'heat:0-50:s1:partial', `#173: a hot-water piece of 20 s inside heating does not divide it (${fmt(inner)})`);
+    const keep = piece([[0, 'idle'], [10 * M, 'dhw'], [40 * M, 'heating'], [41 * M, 'idle']], [[0, '0'], [10 * M, '40'], [41 * M, '0']], 0, 60 * M);
+    check(fmt(keep) === 'dhw:10-40:s1 heat:40-41:s1', `#173: a heating period of a minute stays its own (${fmt(keep)})`);
+    const now = piece([[0, 'idle'], [10 * M, 'dhw'], [40 * M, 'heating']], [[0, '0'], [10 * M, '40']], 0, 40 * M + 30 * S);
+    check(fmt(now) === 'dhw:10-40:s1 heat:40-40.5:s1:ongoing', `#173: a short heating period that is still going keeps its place (${fmt(now)})`);
     card.remove();
   }
   {

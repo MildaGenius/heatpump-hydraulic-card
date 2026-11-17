@@ -1433,6 +1433,9 @@ const HFC_PRESETS = {
     auto_circuits: false,
     // The outdoor unit draws about 250 W while the compressor is off (#403); the compressor status tells running.
     power_threshold: 300,
+    // The room sensor counts only while it reports a temperature, and the bus delivers values only when they are polled: the card
+    // looks again every minute, so a room reading that arrives late still appears (Codex review).
+    dynamic: true,
     // The flow temperature and the compressor status together, both on platform ehs_sentinel.
     detect: (ctx) => {
       const re = /^sensor\.(.+)_indoorwaterouttemp$/;

@@ -1010,6 +1010,8 @@ const HFC_PRESETS = {
     name: 'Aira (ha-airahome)',
     // The outdoor unit's primary circulator feeds the buffer and the hot-water coil.
     primary_pump: true,
+    // Each zone has its own thermostat: room, target and humidity go to the numbered keys of zone 2 (Codex review).
+    circuit_rooms: true,
     detect: (ctx) => (ctx.key('airahome', 'sensor', 'active_state') && ctx.key('airahome', 'sensor', 'ou_supply_temp') ? '' : undefined),
     entities: (p, i, ctx) => {
       const s = (tk) => ctx.key('airahome', 'sensor', tk);
@@ -3433,7 +3435,7 @@ class HeatpumpFlowCard extends HTMLElement {
       Object.entries(rawN).filter(([k]) => k.startsWith('hc_') && k !== 'hc_pressure').forEach(([k, v]) => take(`hc${n}_${k.slice(3)}`, v));
       // Room keys are not prefixed with hc_ in a preset because circuit 1 uses room/room_target. Carry the circuit-specific
       // result into the numbered public keys so the house overview receives the rooms of circuits 2 to 6.
-      if (preset.circuit_rooms) ['room', 'room_target'].forEach((k) => take(`hc${n}_${k}`, rawN[k]));
+      if (preset.circuit_rooms) ['room', 'room_target', 'room_humidity'].forEach((k) => take(`hc${n}_${k}`, rawN[k]));
     }
     const e = { ...fromPreset };
     const sums = { ...presetSums };

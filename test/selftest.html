@@ -1431,6 +1431,16 @@
     card.hass = hassOf({ ...states }, registry); await wait(5);
     check(card.shadowRoot.getElementById('chip-err').classList.contains('on'), 'Aira: alarms on shows the error chip');
     card.remove();
+    // Codex review: with hc_count 2, zone 2 gets its own room, target and humidity.
+    add('sensor.ah_3e2_zone_2_supply_temperature', 'zone_2_supply_temp', '27.5', '°C');
+    add('binary_sensor.ah_3e2_zone_2_circulator', 'zone_2_circulator', 'on');
+    add('sensor.ah_3e2_zone_2_temperature', 'zone_2_temp', '18.5', '°C');
+    add('sensor.ah_3e2_zone_2_humidity', 'zone_2_humidity', '55', '%');
+    add('climate.ah_3e2_zone_2', 'zone_2_climate', 'heat', null, { temperature: 18, current_temperature: 18.5 });
+    const z2 = C._resolve({ preset: 'airahome', hc_count: 2 }, hassOf({ ...states }, registry)).entities;
+    check(z2.hc2_flow === 'sensor.ah_3e2_zone_2_supply_temperature' && z2.hc2_room === 'sensor.ah_3e2_zone_2_temperature'
+      && z2.hc2_room_target === 'climate.ah_3e2_zone_2' && z2.hc2_room_humidity === 'sensor.ah_3e2_zone_2_humidity' && z2.room === 'sensor.ah_3e2_zone_1_temperature',
+    `Aira: zone 2 has its own room, target and humidity (${z2.hc2_room} / ${z2.hc2_room_target} / ${z2.hc2_room_humidity})`);
     check(!detects('airahome', { 'sensor.x_active_state': 'heating' }, { 'sensor.x_active_state': { platform: 'other', translation_key: 'active_state' } }), 'Aira: an active state of another platform is not Aira');
   }
   {

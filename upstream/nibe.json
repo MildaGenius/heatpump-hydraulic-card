@@ -1,0 +1,40 @@
+{
+  "preset": "nibe",
+  "reviewed": {
+    "date": "2026-11-17",
+    "version": "2.26.0",
+    "note": "Built from HA core nibe_heatpump (entity ids from the coil names, entity.py) with nibe 2.26.0 and the model files f370_f372_f470, f730, f750, f1145_f1245 and f1155_f1255 (every mapped core coil exists in all five), checked against the F470 installation of #253."
+  },
+  "unmapped": {
+    "power": "The F series reports no electrical power of the compressor; only the electric addition has a power coil (mapped as heater).",
+    "heat": "No heat output coil in the F series model files.",
+    "volume": "No flow rate coil on the exhaust air models; the card cannot estimate the heat output.",
+    "defrost": "A defrost is reported only as alarm 183 (alarm-45001), not as a state of its own; the alarm is excluded from the error chip.",
+    "dhw_target": "The water heater entity holds start and stop temperatures (target_temp_low, target_temp_high), no single target.",
+    "hc_flow": "BT2 is the supply of climate system 1 and already the heat pump flow; the card draws it as a direct circuit."
+  },
+  "sources": [
+    {
+      "repo": "home-assistant/core",
+      "branch": "dev",
+      "releases": false,
+      "paths": [
+        "homeassistant/components/nibe_heatpump/entity.py",
+        "homeassistant/components/nibe_heatpump/sensor.py",
+        "homeassistant/components/nibe_heatpump/manifest.json"
+      ]
+    },
+    {
+      "repo": "yozik04/nibe",
+      "branch": "master",
+      "releases": true,
+      "paths": [
+        "nibe/data/f370_f372_f470.json",
+        "nibe/data/f730.json",
+        "nibe/data/f750.json",
+        "nibe/data/f1145_f1245.json",
+        "nibe/data/f1155_f1255.json"
+      ]
+    }
+  ]
+}

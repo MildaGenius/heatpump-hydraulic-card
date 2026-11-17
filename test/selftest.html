@@ -663,6 +663,21 @@
     check(fmt(phase) === 'heat:10-30:s1 dhw:40-50:s2:p10' && phase.every((r) => r.source === 'phase'), `without a compressor the runs are phases (${fmt(phase)})`);
     const unrecorded = runsOf({ 'sensor.m': h([[0, 'idle'], [10, 'heating'], [30, 'idle']]) }, ids, 0, 60);
     check(fmt(unrecorded) === 'heat:10-30:s1' && unrecorded[0].source === 'phase', `a compressor without recorded history leaves the mode phases (${fmt(unrecorded)})`);
+    // #173: the hot-water flag ends about 30 s before the compressor has ramped down. The heating piece of 30 s after the charge, and
+    // one of 4 s before it, fold into the charge; a heating period of a minute or more stays its own, and so does an ongoing one.
+    const S = 1000;
+    const piece = (pairs, c, s, e) => card._timelineRuns({ 'sensor.m': pairs.map(([t, x]) => ({ t, s: x })), 'sensor.c': c.map(([t, x]) => ({ t, s: x })) }, ids,
+      card._timelineSegments({ 'sensor.m': pairs.map(([t, x]) => ({ t, s: x })), 'sensor.c': c.map(([t, x]) => ({ t, s: x })) }, ids, s, e), s, e);
+    const tail = piece([[0, 'idle'], [10 * M, 'dhw'], [40 * M, 'heating'], [40 * M + 30 * S, 'idle']], [[0, '0'], [10 * M, '40'], [40 * M + 30 * S, '0']], 0, 60 * M);
+    check(fmt(tail) === 'dhw:10-40.5:s1', `#173: a heating piece of 30 s after a charge is part of the charge (${fmt(tail)})`);
+    const head = piece([[0, 'idle'], [10 * M, 'heating'], [10 * M + 4 * S, 'dhw'], [40 * M, 'idle']], [[0, '0'], [10 * M, '40'], [40 * M, '0']], 0, 60 * M);
+    check(fmt(head) === 'dhw:10-40:s1', `#173: a heating piece of 4 s before a charge is part of the charge (${fmt(head)})`);
+    const inner = piece([[0, 'heating'], [20 * M, 'dhw'], [20 * M + 20 * S, 'heating'], [50 * M, 'idle']], [[0, '40'], [50 * M, '0']], 0, 60 * M);
+    check(fmt(inner) === 'heat:0-50:s1:partial', `#173: a hot-water piece of 20 s inside heating does not divide it (${fmt(inner)})`);
+    const keep = piece([[0, 'idle'], [10 * M, 'dhw'], [40 * M, 'heating'], [41 * M, 'idle']], [[0, '0'], [10 * M, '40'], [41 * M, '0']], 0, 60 * M);
+    check(fmt(keep) === 'dhw:10-40:s1 heat:40-41:s1', `#173: a heating period of a minute stays its own (${fmt(keep)})`);
+    const now = piece([[0, 'idle'], [10 * M, 'dhw'], [40 * M, 'heating']], [[0, '0'], [10 * M, '40']], 0, 40 * M + 30 * S);
+    check(fmt(now) === 'dhw:10-40:s1 heat:40-40.5:s1:ongoing', `#173: a short heating period that is still going keeps its place (${fmt(now)})`);
     card.remove();
   }
   {
@@ -1417,6 +1432,56 @@
     check(card.shadowRoot.getElementById('chip-err').classList.contains('on'), 'Aira: alarms on shows the error chip');
     card.remove();
     check(!detects('airahome', { 'sensor.x_active_state': 'heating' }, { 'sensor.x_active_state': { platform: 'other', translation_key: 'active_state' } }), 'Aira: an active state of another platform is not Aira');
+  }
+  {
+    // #253: NIBE F470 with the core integration NIBE Heat Pump, the ids and values of wlouckx's installation (alarm 183 = defrost).
+    const states = toStates({
+      'sensor.prio_43086': 'HEAT', 'sensor.compressor_state_ep14_43427': 'RUNNING', 'sensor.supply_pump_state_ep14_43431': 'ON',
+      'sensor.bt1_outdoor_temperature_40004': ['3.7', '°C'], 'sensor.bt2_supply_temp_s1_40008': ['24.4', '°C'],
+      'sensor.eb100_ep14_bt3_return_temp_40012': ['23.5', '°C'], 'sensor.bt7_hw_top_40013': ['56.0', '°C'], 'sensor.bt6_hw_load_40014': ['46.9', '°C'],
+      'sensor.eb100_bt16_evaporator_temp_40020': ['3.3', '°C'], 'sensor.eb100_ep14_bt17_suction_40022': 'unknown',
+      'sensor.bt20_exhaust_air_temp_1_40025': ['21.1', '°C'], 'sensor.bt21_vented_air_temp_1_40026': ['1.6', '°C'],
+      'sensor.bt50_room_temp_s1_40033': 'unknown', 'sensor.calc_supply_s1_43009': ['25.0', '°C'], 'sensor.int_el_add_power_43084': ['0.0', 'kW'],
+      'sensor.alarm_45001': '183', 'select.holiday_activated_48043': 'INACTIVE', 'water_heater.f470_hot_water': 'heat_pump',
+    });
+    const registry = Object.fromEntries(Object.keys(states).map((id) => [id, { platform: 'nibe_heatpump' }]));
+    const hass = hassOf(states, registry);
+    check(C.getStubConfig(hass).preset === 'nibe', `NIBE is detected (${JSON.stringify(C.getStubConfig(hass))})`);
+    const r = C._resolve({ preset: 'nibe' }, hass); const e = r.entities;
+    check(r.ready && e.mode === 'sensor.prio_43086' && e.compressor === 'sensor.compressor_state_ep14_43427' && e.flow === 'sensor.bt2_supply_temp_s1_40008'
+      && e.return === 'sensor.eb100_ep14_bt3_return_temp_40012' && e.outdoor === 'sensor.bt1_outdoor_temperature_40004'
+      && e.primary_pump_state === 'sensor.supply_pump_state_ep14_43431' && e.heater === 'sensor.int_el_add_power_43084',
+    `NIBE core: prio, compressor state, BT2, BT3, BT1, supply pump, electric addition (${e.mode} / ${e.compressor} / ${e.flow})`);
+    check(e.dhw_top === 'sensor.bt7_hw_top_40013' && e.dhw_bottom === 'sensor.bt6_hw_load_40014' && e.source_in === 'sensor.bt20_exhaust_air_temp_1_40025'
+      && e.source_out === 'sensor.bt21_vented_air_temp_1_40026' && e.hc_setpoint === 'sensor.calc_supply_s1_43009' && e.program === 'select.holiday_activated_48043'
+      && e.room === undefined && e.compressor_speed === undefined && e.evap_temp === 'sensor.eb100_bt16_evaporator_temp_40020',
+    `NIBE F470: tank BT7/BT6, exhaust and vented air as the source, calculated supply, holiday; no room without BT50, no speed on a fixed-speed unit (${e.source_in} / ${e.room} / ${e.compressor_speed})`);
+    const findings = C._checks({ preset: 'nibe' }, hass, r).map((f) => `${f.key}:${f.code}`);
+    check(!findings.length, `NIBE: the mapping passes the plausibility checks (${findings.join(', ')})`);
+    const card = mount({ preset: 'nibe' }, hass); await wait(20);
+    const F = card._flowModel();
+    check(F.running && F.hp === 'heating' && !card.shadowRoot.getElementById('chip-err')?.classList.contains('on'),
+      `NIBE: heating while the compressor is RUNNING, alarm 183 (defrost) is no error (${F.hp})`);
+    card.hass = hassOf({ ...states, ...toStates({ 'sensor.prio_43086': 'HOT WATER', 'sensor.alarm_45001': '162' }) }, registry); await wait(5);
+    const dhw = card._flowModel();
+    const errOn = card.shadowRoot.getElementById('chip-err').classList.contains('on');
+    check(dhw.hp === 'dhw' && errOn, `NIBE: prio HOT WATER means hot water, alarm 162 is an error (${dhw.hp} / ${errOn})`);
+    card.hass = hassOf({ ...states, ...toStates({ 'sensor.prio_43086': 'OFF', 'sensor.compressor_state_ep14_43427': 'STOPPED', 'sensor.alarm_45001': '0' }) }, registry); await wait(5);
+    const idle = card._flowModel();
+    check(!idle.running && idle.hp === 'idle', `NIBE: prio OFF and STOPPED is idle (${idle.hp})`);
+    card.remove();
+    // Brine models (F1x55) take the brine sensors and the inverter frequency; a room sensor that reports gives the room.
+    const brine = { ...states, ...toStates({ 'sensor.eb100_ep14_bt10_brine_in_temp_40015': ['4.1', '°C'], 'sensor.eb100_ep14_bt11_brine_out_temp_40016': ['1.2', '°C'],
+      'sensor.compressor_frequency_actual_43136': ['48', 'Hz'], 'sensor.bt50_room_temp_s1_40033': ['21.4', '°C'] }) };
+    const rb = C._resolve({ preset: 'nibe' }, hassOf(brine, Object.fromEntries(Object.keys(brine).map((id) => [id, { platform: 'nibe_heatpump' }])))).entities;
+    check(rb.source_in === 'sensor.eb100_ep14_bt10_brine_in_temp_40015' && rb.source_out === 'sensor.eb100_ep14_bt11_brine_out_temp_40016'
+      && rb.compressor_speed === 'sensor.compressor_frequency_actual_43136' && rb.room === 'sensor.bt50_room_temp_s1_40033',
+    `NIBE brine models: BT10/BT11 before the exhaust air, compressor frequency, BT50 as the room (${rb.source_in} / ${rb.compressor_speed} / ${rb.room})`);
+    // The S series uses the same numbers for other coils: degree minutes 40012 or a foreign prio entity are no NIBE F series.
+    check(!detects('nibe', { 'sensor.degree_minutes_40012': '-120', 'sensor.prio_43086': 'HEAT' }, { 'sensor.degree_minutes_40012': { platform: 'nibe_heatpump' }, 'sensor.prio_43086': { platform: 'nibe_heatpump' } }),
+      'NIBE: prio alone without the compressor state is not detected');
+    check(!detects('nibe', { 'sensor.prio_43086': 'HEAT', 'sensor.compressor_state_ep14_43427': 'RUNNING' },
+      { 'sensor.prio_43086': { platform: 'mqtt' }, 'sensor.compressor_state_ep14_43427': { platform: 'mqtt' } }), 'NIBE: the same ids from another integration are not detected');
   }
   {
     const states = {}; const registry = {};
@@ -3539,7 +3604,7 @@
     check(o.samsung === 1 && o.ring === 0 && o.fans === 1 && o.ok, `Samsung preset draws the EHS Mono unit (${JSON.stringify(o)})`);
     // Automatic drawing per preset, as listed in the README table "Outdoor-unit style coverage" (#151). A new preset needs an entry here.
     const unitOf = { lambda: 'lambda', vicare: 'viessmann', open3e: 'viessmann', vaillant: 'vaillant', ebusd: 'vaillant', emsesp: 'bosch', bosch_buderus_heating: 'bosch',
-      heishamon: 'panasonic', samsung: 'samsung', wolf: 'wolf', kronoterm: 'kronoterm', luxtronik: 'alpha_innotec', stiebel_isg: 'stiebel', espaltherma: 'generic', airahome: 'generic' };
+      heishamon: 'panasonic', samsung: 'samsung', wolf: 'wolf', kronoterm: 'kronoterm', luxtronik: 'alpha_innotec', stiebel_isg: 'stiebel', espaltherma: 'generic', airahome: 'generic', nibe: 'generic' };
     const unitWrong = Object.keys(HFC_PRESETS).filter((p) => (HFC_PRESETS[p].unit_style || 'generic') !== unitOf[p]);
     check(!unitWrong.length, `every preset selects the outdoor-unit drawing the README lists (${unitWrong.join(', ') || 'all match'})`);
     check(Object.values(unitOf).every((s) => HFC_UNIT_STYLES.includes(s)), 'the expected drawings are valid unit_style values');
@@ -4536,6 +4601,52 @@
       '#23: the diagnostic report names averaged and summed members');
   }
 
+  // 18e2. #407: defrosts and HeishaMon starts without the two restarts of each defrost, from the recorder history. The counter steps
+  // and defrost windows of 13.11.2026 from the report: 10 steps, 2 real starts, 4 defrosts.
+  {
+    const p = 'panasonic_heat_pump'; const counter = `sensor.${p}_main_operations_counter`; const df = `binary_sensor.${p}_main_defrosting_state`;
+    const T0 = Date.parse('2026-11-13T00:00:00Z'); const at = (hm, s) => { const [h, m] = hm.split(':').map(Number); return { s: String(s), lu: (T0 + (h * 60 + m) * 60000) / 1000 }; };
+    const history = {
+      [counter]: [at('00:00', 6515), at('01:09', 6516), at('08:03', 6517), at('08:57', 6518), at('09:02', 6519), at('10:34', 6520), at('10:39', 6521),
+        at('13:02', 6522), at('13:06', 6523), at('16:05', 6524), at('16:09', 6525)],
+      [df]: [at('00:00', 'off'), at('08:55', 'on'), at('09:03', 'off'), at('10:32', 'on'), at('10:41', 'off'), at('13:00', 'on'), at('13:08', 'off'), at('16:03', 'on'), at('16:11', 'off')],
+    };
+    const st = toStates({
+      [`sensor.${p}_main_main_outlet_temp`]: ['36', '°C'], [`sensor.${p}_main_main_inlet_temp`]: ['32', '°C'], [`sensor.${p}_main_compressor_freq`]: ['19', 'Hz'],
+      [counter]: { state: '6525', attributes: { state_class: 'total_increasing' } }, [df]: 'off',
+    });
+    const queries = [];
+    const hassH = (h) => ({ ...hassOf(st), callWS: (q) => { queries.push(q); return q.type === 'history/history_during_period' ? Promise.resolve(h) : Promise.reject(new Error('n/a')); } });
+    const tileVals = (c) => Object.fromEntries([...c.shadowRoot.querySelectorAll('.stat')].map((x) => [x.querySelector('.sl').textContent, x.querySelector('.sv').textContent]));
+    let card = mount({ preset: 'heishamon', tiles: ['starts:today', 'defrosts:today', 'starts:month'] }, hassH(history)); await wait(40);
+    let v = tileVals(card);
+    const hq = queries.find((q) => q.type === 'history/history_during_period');
+    check(v['Compressor starts · today'] === '2' && v['Defrosts · today'] === '4', `#407: HeishaMon starts today leave out the restarts of 4 defrosts (${JSON.stringify(v)})`);
+    check(card._tileSource('starts', 'month')?.stat === counter && !card._tileSource('defrosts', 'month'),
+      '#407: longer periods keep the raw counter; defrosts exist for the periods within the history only');
+    check(hq && hq.entity_ids.includes(df) && hq.entity_ids.includes(counter) && hq.no_attributes, `#407: one history query for the defrost entity and the counter (${JSON.stringify(hq?.entity_ids)})`);
+    card.remove();
+    // A defrost already going at midnight belongs to the day before; a counter step 30 s after a defrost still belongs to it.
+    const edge = {
+      [counter]: [at('00:00', 100), at('00:03', 101), { s: '102', lu: (T0 + (5 * 60 + 10) * 60000 + 30000) / 1000 }, at('07:00', 103)],
+      [df]: [at('00:00', 'on'), at('00:05', 'off'), at('05:00', 'on'), at('05:10', 'off'), at('06:00', 'unavailable'), at('06:01', 'on'), at('06:04', 'off')],
+    };
+    card = mount({ preset: 'heishamon', tiles: ['starts:today', 'defrosts:today'] }, hassH(edge)); await wait(40);
+    v = tileVals(card);
+    check(v['Compressor starts · today'] === '1' && v['Defrosts · today'] === '1',
+      `#407: no defrost from midnight or after unavailable, a step within ${HFC_HISTORY_COUNT.grace} s after a defrost is its restart (${JSON.stringify(v)})`);
+    card.remove();
+    // An own tile source is taken as it is; another preset counts defrosts but not its starts.
+    card = mount({ preset: 'heishamon', tiles: ['starts:today'], tile_sources: { starts: counter } }, hassH(history)); await wait(40);
+    check(card._tileSource('starts', 'today')?.stat === counter, '#407: tile_sources.starts keeps the plain counter');
+    card.remove();
+    const other = mount({ entities: { compressor: 'sensor.c', defrost: df, flow: 'sensor.f', return: 'sensor.r' }, tiles: ['defrosts:today'] },
+      { ...hassOf(toStates({ 'sensor.c': 'on', [df]: 'off', 'sensor.f': ['35', '°C'], 'sensor.r': ['30', '°C'] })), callWS: (q) => (q.type === 'history/history_during_period' ? Promise.resolve(history) : Promise.reject(new Error('n/a'))) });
+    await wait(40);
+    check(tileVals(other)['Defrosts · today'] === '4' && !other._tileSource('starts', 'today')?.history, '#407: any configuration with a defrost entity counts defrosts; only the flagged preset changes the starts');
+    other.remove();
+  }
+
   // 18f. HeishaMon: refrigerant temperatures and the superheat computed from them
   {
     const p = 'panasonic_heat_pump';
@@ -4564,6 +4675,70 @@
     const own = mount({ preset: 'heishamon', entities: { evap_temp: `sensor.${p}_main_outside_pipe_temp` } }, hassOf(toStates({ ...st, [`switch.${p}_main_defrosting_state`]: 'on' }))); await wait(20);
     check(value(own, 'evap_temp') !== '–' && value(own, 'suction_temp') === '–', 'an entity set in the config keeps its value in defrost');
     own.remove();
+    // #413: at standstill the refrigerant temperatures settle to the surroundings, so the derived superheat and subcooling show '–';
+    // a superheat the integration reports itself stays.
+    const still = { ...st, [`sensor.${p}_main_compressor_freq`]: ['0', 'Hz'] };
+    const off = mount({ preset: 'heishamon' }, hassOf(toStates(still))); await wait(20);
+    check(!off._flowModel().running && value(off, 'superheat') === '–' && /1/.test(value(off, 'evap_temp')),
+      `#413: no derived superheat while the compressor is off, the temperatures stay (${value(off, 'superheat')} / ${value(off, 'evap_temp')})`);
+    off.hass = hassOf(toStates(st)); await wait(5);
+    check(value(off, 'superheat') === '2.0 K', `#413: the derived superheat returns when the compressor runs (${value(off, 'superheat')})`);
+    off.remove();
+    const reported = mount({ preset: 'heishamon', entities: { superheat: 'sensor.own_superheat' } }, hassOf(toStates({ ...still, 'sensor.own_superheat': ['-3.1', 'K'] }))); await wait(20);
+    check(value(reported, 'superheat') === '-3.1 K', `#413: a reported superheat stays at standstill (${value(reported, 'superheat')})`);
+    reported.remove();
+  }
+  {
+    // #413: the name of an own entity in the details and in a free tile loses a leading device name, from the registry.
+    const states = toStates({
+      'sensor.flow': ['35', '°C'], 'sensor.return': ['30', '°C'],
+      'sensor.hc_pc0_flow': { state: '12', attributes: { friendly_name: 'Buderus WLW186i PC0 flow', unit_of_measurement: 'l/h' } },
+      'sensor.heater_power': { state: '0', attributes: { friendly_name: 'Heater power', unit_of_measurement: 'W' } },
+      'sensor.plain': { state: '3', attributes: { friendly_name: 'Buderus WLW186i' } },
+    });
+    const registry = { 'sensor.hc_pc0_flow': { device_id: 'd1' }, 'sensor.heater_power': { device_id: 'd2' }, 'sensor.plain': { device_id: 'd1' } };
+    const hass = { ...hassOf(states, registry), devices: { d1: { name: 'Buderus WLW186i' }, d2: { name: 'Heat' } } };
+    const card = mount({ entities: { flow: 'sensor.flow', return: 'sensor.return' }, details: ['sensor.hc_pc0_flow', 'sensor.heater_power', 'sensor.plain'],
+      tiles: [{ entity: 'sensor.hc_pc0_flow' }] }, hass); await wait(20);
+    const more = card._drawerRows().flatMap(([, list]) => list).filter((x) => /^x\d$/.test(x[0])).map((x) => x[1]);
+    check(more.join('|') === 'PC0 flow|Heater power|Buderus WLW186i', `#413: device name dropped at a word boundary only, a name of the device alone stays (${more.join('|')})`);
+    const tile = card.shadowRoot.querySelector('.stat .sl')?.textContent;
+    check(tile === 'PC0 flow', `#413: a free tile uses the short name as well (${tile})`);
+    card.hass = { ...hass, devices: { d1: { name: 'Buderus WLW186i', name_by_user: 'Heat pump' } } }; await wait(5);
+    check(card._entityName('sensor.hc_pc0_flow') === 'Buderus WLW186i PC0 flow', 'the name the user gave the device is the one that counts');
+    card.remove();
+  }
+  {
+    // #413: a preset's default tiles replace the default row while `tiles` is not set; `tiles` and an empty list still win.
+    const s = setups[0];
+    const states = toStates(s.states('heat'));
+    const saved = HFC_PRESETS.lambda.default_tiles;
+    HFC_PRESETS.lambda.default_tiles = ['spread', 'volume'];
+    const labels = (c) => [...c.shadowRoot.querySelectorAll('.stat .sl')].map((x) => x.textContent);
+    const base = { ...s.config }; delete base.tiles;
+    let card = mount(base, hassOf(states)); await wait(20);
+    const def = labels(card);
+    card.remove();
+    card = mount({ ...base, tiles: ['outdoor'] }, hassOf(states)); await wait(20);
+    const own = labels(card);
+    card.remove();
+    card = mount({ ...base, tiles: [] }, hassOf(states)); await wait(20);
+    const none = card.shadowRoot.getElementById('stats').style.display;
+    card.remove();
+    const opts = C._tileOptions({ preset: 'lambda', ...base }, C._resolve({ preset: 'lambda', ...base }, hassOf(states)), hassOf(states));
+    if (saved === undefined) delete HFC_PRESETS.lambda.default_tiles; else HFC_PRESETS.lambda.default_tiles = saved;
+    check(def.length === 2 && !def.some((l) => /COP/.test(l)), `#413: default tiles of the preset instead of the default row (${def.join(', ')})`);
+    check(own.length === 1 && none === 'none', `#413: own tiles and an empty list still win (${own.join(', ')} / ${none})`);
+    check(opts.defaults.join() === 'spread,volume', `#413: the editor starts the own selection from the preset's default tiles (${opts.defaults.join()})`);
+    const bad = Object.entries(HFC_PRESETS).flatMap(([name, p]) => (p.default_tiles || []).map((t) => [name, C._tileSpec(t)]).filter(([, t]) => !HFC_TILES[t?.key]).map(([name, t]) => `${name}:${t?.key}`));
+    check(!bad.length && Array.isArray(HFC_PRESETS.bosch_buderus_heating.default_tiles), `#413: every default tile of a preset is a catalog tile, Bosch/Buderus has them (${bad.join(', ') || 'ok'})`);
+    // The demo "Bosch/Buderus Home Comfort" without its `tiles`: catalog tiles from the gateway's totals, not only spread and flow rate.
+    const hc = setups.find((x) => x.name === 'Bosch/Buderus Home Comfort');
+    const hcConfig = { ...hc.config }; delete hcConfig.tiles;
+    const bosch = mount(hcConfig, hassOf(toStates(hc.states('heat')), hc.registry || {}, hc.energy, hc)); await wait(60);
+    const bl = labels(bosch);
+    bosch.remove();
+    check(bl.length > 2 && bl.some((l) => /Electricity/.test(l)) && !bl.some((l) => /COP heating/.test(l)), `#413: Home Comfort shows its default catalog tiles (${bl.join(', ')})`);
   }
 
   // 18k. heating curve shift: target, curve and shift above the circuit pump, the flow temperature below it (HeishaMon heat request)
@@ -4883,7 +5058,7 @@
     card = await mountSetup('Kronoterm ADAPT');
     check(!!q(card, 'circle.pump[cx="720"]'), 'Kronoterm: the loop pump stays in the circuit next to the primary pump');
     card.remove();
-    check(Object.entries(HFC_PRESETS).filter(([, p]) => p.primary_pump).map(([k]) => k).sort().join() === 'airahome,espaltherma,heishamon,kronoterm,samsung', 'presets with a primary pump: Aira, ESPAltherma, HeishaMon, Kronoterm, Samsung');
+    check(Object.entries(HFC_PRESETS).filter(([, p]) => p.primary_pump).map(([k]) => k).sort().join() === 'airahome,espaltherma,heishamon,kronoterm,nibe,samsung', 'presets with a primary pump: Aira, ESPAltherma, HeishaMon, Kronoterm, NIBE, Samsung');
   }
 
   // 18p. hot-water standby loss (#32): cool-down in K/h only in verified standby windows, charging and draw-off excluded

@@ -678,6 +678,11 @@
     check(fmt(keep) === 'dhw:10-40:s1 heat:40-41:s1', `#173: a heating period of a minute stays its own (${fmt(keep)})`);
     const now = piece([[0, 'idle'], [10 * M, 'dhw'], [40 * M, 'heating']], [[0, '0'], [10 * M, '40']], 0, 40 * M + 30 * S);
     check(fmt(now) === 'dhw:10-40:s1 heat:40-40.5:s1:ongoing', `#173: a short heating period that is still going keeps its place (${fmt(now)})`);
+    // Codex review of #444: a run folded into one period takes its kind; the first period of a run cut by the window keeps its place.
+    const short = piece([[0, 'idle'], [10 * M, 'heating'], [10 * M + 50 * S, 'dhw'], [10 * M + 90 * S, 'idle']], [[0, '0'], [10 * M, '40'], [10 * M + 90 * S, '0']], 0, 20 * M);
+    check(fmt(short) === 'dhw:10-11.5:s1' && short[0].kind === 'dhw', `a run folded into its hot-water period is a hot-water run (${fmt(short)})`);
+    const cutStart = piece([[0, 'heating'], [30 * M, 'dhw'], [40 * M, 'idle']], [[0, '40'], [40 * M, '0']], 30 * M - 30 * S, 50 * M);
+    check(fmt(cutStart) === 'heat:29.5-30:s1:partial dhw:30-40:s1', `the first period of a run that began before the window is not folded (${fmt(cutStart)})`);
     card.remove();
   }
   {
@@ -4539,7 +4544,8 @@
   // and defrost windows of 13.11.2026 from the report: 10 steps, 2 real starts, 4 defrosts.
   {
     const p = 'panasonic_heat_pump'; const counter = `sensor.${p}_main_operations_counter`; const df = `binary_sensor.${p}_main_defrosting_state`;
-    const T0 = Date.parse('2026-11-13T00:00:00Z'); const at = (hm, s) => { const [h, m] = hm.split(':').map(Number); return { s: String(s), lu: (T0 + (h * 60 + m) * 60000) / 1000 }; };
+    // The day of the report, placed on today: only changes inside the period count.
+    const T0 = Date.parse(C.prototype._periodRange.call({ _hass: { config: {} } }, 'today')[0]); const at = (hm, s) => { const [h, m] = hm.split(':').map(Number); return { s: String(s), lu: (T0 + (h * 60 + m) * 60000) / 1000 }; };
     const history = {
       [counter]: [at('00:00', 6515), at('01:09', 6516), at('08:03', 6517), at('08:57', 6518), at('09:02', 6519), at('10:34', 6520), at('10:39', 6521),
         at('13:02', 6522), at('13:06', 6523), at('16:05', 6524), at('16:09', 6525)],
@@ -4579,6 +4585,24 @@
     await wait(40);
     check(tileVals(other)['Defrosts · today'] === '4' && !other._tileSource('starts', 'today')?.history, '#407: any configuration with a defrost entity counts defrosts; only the flagged preset changes the starts');
     other.remove();
+    // Codex review of #446: missing history is no count of 0; a restart just after midnight belongs to the defrost before it.
+    const ats = (ms, s) => ({ s: String(s), lu: (T0 + ms) / 1000 });
+    const noData = [{}, { [counter]: history[counter], [df]: [ats(0, 'unavailable')] }, { [counter]: [ats(0, 'unknown')], [df]: history[df] }];
+    const texts = [];
+    for (const h of noData) {
+      card = mount({ preset: 'heishamon', tiles: ['starts:today', 'defrosts:today'] }, hassH(h)); await wait(40);
+      v = tileVals(card); texts.push(`${v['Compressor starts · today']}/${v['Defrosts · today'] ?? 'none'}`);
+      card.remove();
+    }
+    check(texts.join(' ') === '–/– –/– –/4', `#446: without usable history the tiles show "–", not 0 (${texts.join(' ')})`);
+    queries.length = 0;
+    const night = { [counter]: [ats(-50000, 200), ats(10000, 201), ats(3600000, 202)], [df]: [ats(-50000, 'on'), ats(-10000, 'off')] };
+    card = mount({ preset: 'heishamon', tiles: ['starts:today'] }, hassH(night)); await wait(40);
+    v = tileVals(card);
+    const start = queries.find((q) => q.type === 'history/history_during_period')?.start_time;
+    check(v['Compressor starts · today'] === '1' && Date.parse(start) === T0 - HFC_HISTORY_COUNT.grace * 1000,
+      `#446: a step 10 s after a defrost that ended before midnight is its restart; the query starts the grace time earlier (${v['Compressor starts · today']} / ${start})`);
+    card.remove();
   }
 
   // 18f. HeishaMon: refrigerant temperatures and the superheat computed from them

@@ -4881,29 +4881,34 @@ class HeatpumpFlowCard extends HTMLElement {
   // Defrosts, or starts without the restarts of a defrost, in a period from the recorder history (#407). A defrost is an off → on
   // change of the defrost entity; one that was already going at the start of the period belongs to the period before. A start is a
   // step of the counter; a step while the defrost entity is on, or up to HFC_HISTORY_COUNT.grace seconds after, is a restart of that
-  // defrost. NaN while the history loads or when it is not available.
+  // defrost. The query starts the grace time before the period, so a defrost that ended just before midnight still claims its
+  // restart after it; only changes inside the period count. NaN while the history loads, and when a needed history has no usable
+  // state: missing data is no count of 0, and without the defrost history every restart would count as a start.
   _historyCount(src, period) {
     const range = this._periodRange(period); const defrost = this._e.defrost;
     if (!range || !defrost) return NaN;
     const ids = [defrost, src.counter].filter(Boolean);
+    const begin = Date.parse(range[0]); const grace = HFC_HISTORY_COUNT.grace * 1000;
     const hist = this._wsCached(`hcount|${ids.join(',')}|${period}`, {
-      type: 'history/history_during_period', start_time: range[0], ...(range[1] ? { end_time: range[1] } : {}), entity_ids: ids,
+      type: 'history/history_during_period', start_time: new Date(begin - grace).toISOString(), ...(range[1] ? { end_time: range[1] } : {}), entity_ids: ids,
       minimal_response: true, no_attributes: true, significant_changes_only: false,
     }, (res) => this._timelineHistory(res, ids));
     if (!hist) return NaN;
     const known = (s) => !['unknown', 'unavailable', 'none', ''].includes(String(s ?? '').trim().toLowerCase());
     const on = (s) => hfcCompressorOn(s);
     const d = hist[defrost] || [];
-    if (src.history === 'defrosts') return d.filter((e, n) => n > 0 && on(e.s) && known(d[n - 1].s) && !on(d[n - 1].s)).length;
+    if (!d.some((e) => known(e.s))) return NaN;
+    if (src.history === 'defrosts') return d.filter((e, n) => n > 0 && e.t >= begin && on(e.s) && known(d[n - 1].s) && !on(d[n - 1].s)).length;
+    const steps = (hist[src.counter] || []).filter((e) => Number.isFinite(parseFloat(e.s)));
+    if (!steps.length) return NaN;
     // Defrost windows [from, to + grace).
-    const windows = d.map((e, n) => (on(e.s) ? [e.t, (d[n + 1]?.t ?? Infinity) + HFC_HISTORY_COUNT.grace * 1000] : null)).filter(Boolean);
+    const windows = d.map((e, n) => (on(e.s) ? [e.t, (d[n + 1]?.t ?? Infinity) + grace] : null)).filter(Boolean);
     const inDefrost = (t) => windows.some(([a, b]) => t >= a && t < b);
     let starts = 0; let last = NaN;
-    (hist[src.counter] || []).forEach((e) => {
+    steps.forEach((e) => {
       const v = parseFloat(e.s);
-      if (!Number.isFinite(v)) return;
-      // A counter that drops (reset, replaced unit) starts over; only steps upwards count.
-      if (Number.isFinite(last) && v > last && !inDefrost(e.t)) starts += v - last;
+      // A counter that drops (reset, replaced unit) starts over; only steps upwards inside the period count.
+      if (Number.isFinite(last) && v > last && e.t >= begin && !inDefrost(e.t)) starts += v - last;
       last = v;
     });
     return starts;
@@ -6140,17 +6145,20 @@ class HeatpumpFlowCard extends HTMLElement {
       });
       // A period under a minute is no period of its own, as a whole run under a minute is no run (HFC_RUN_SIGNAL.min): it folds into
       // the period before it, the first one into the next. The hot-water flag can end about 30 s before the compressor has ramped
-      // down, which left a heating piece of 30 s after each charge (#173). A last period that is still going keeps its place.
+      // down, which left a heating piece of 30 s after each charge (#173). A last period that is still going keeps its place, and so
+      // does the first of a run that began before the window: only its end is known, not its length.
       const minMs = HFC_RUN_SIGNAL.min * 60000;
+      const split = parts.length > 1;
       for (let n = 0; parts.length > 1 && n < parts.length;) {
         const from = n ? parts[n].from : r.from; const to = parts[n + 1]?.from ?? r.to;
-        if (to - from >= minMs || (n === parts.length - 1 && r.ongoing)) { n++; continue; }
+        if (to - from >= minMs || (n === parts.length - 1 && r.ongoing) || (n === 0 && r.partial)) { n++; continue; }
         parts.splice(n, 1);
         // Neighbours of the same kind become one period again; start over, since earlier periods may have grown.
         for (let k = parts.length - 1; k > 0; k--) if (parts[k].kind === parts[k - 1].kind) parts.splice(k, 1);
         n = 0;
       }
-      if (parts.length < 2) return [r];
+      // A run folded into one period takes that period's kind, so its head and values follow what is left (Codex review of #444).
+      if (parts.length < 2) return [split && parts[0] ? { ...r, kind: parts[0].kind } : r];
       return parts.map((part, n) => {
         const from = n ? part.from : r.from; const to = parts[n + 1]?.from ?? r.to;
         return { ...r, from, to, kind: part.kind, phases: phasesIn(from, to), partial: r.partial && !n, ongoing: r.ongoing && n === parts.length - 1, pause: n ? null : r.pause };

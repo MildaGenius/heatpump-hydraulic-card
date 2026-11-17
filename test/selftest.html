@@ -1353,6 +1353,56 @@
     check(!detects('espaltherma', { 'sensor.althermasensors': 'Online' }, { 'sensor.althermasensors': { platform: 'mqtt' } }), 'ESPAltherma: the attribute sensor alone is not detected');
   }
   {
+    // #253: NIBE F470 with the core integration NIBE Heat Pump, the ids and values of wlouckx's installation (alarm 183 = defrost).
+    const states = toStates({
+      'sensor.prio_43086': 'HEAT', 'sensor.compressor_state_ep14_43427': 'RUNNING', 'sensor.supply_pump_state_ep14_43431': 'ON',
+      'sensor.bt1_outdoor_temperature_40004': ['3.7', '°C'], 'sensor.bt2_supply_temp_s1_40008': ['24.4', '°C'],
+      'sensor.eb100_ep14_bt3_return_temp_40012': ['23.5', '°C'], 'sensor.bt7_hw_top_40013': ['56.0', '°C'], 'sensor.bt6_hw_load_40014': ['46.9', '°C'],
+      'sensor.eb100_bt16_evaporator_temp_40020': ['3.3', '°C'], 'sensor.eb100_ep14_bt17_suction_40022': 'unknown',
+      'sensor.bt20_exhaust_air_temp_1_40025': ['21.1', '°C'], 'sensor.bt21_vented_air_temp_1_40026': ['1.6', '°C'],
+      'sensor.bt50_room_temp_s1_40033': 'unknown', 'sensor.calc_supply_s1_43009': ['25.0', '°C'], 'sensor.int_el_add_power_43084': ['0.0', 'kW'],
+      'sensor.alarm_45001': '183', 'select.holiday_activated_48043': 'INACTIVE', 'water_heater.f470_hot_water': 'heat_pump',
+    });
+    const registry = Object.fromEntries(Object.keys(states).map((id) => [id, { platform: 'nibe_heatpump' }]));
+    const hass = hassOf(states, registry);
+    check(C.getStubConfig(hass).preset === 'nibe', `NIBE is detected (${JSON.stringify(C.getStubConfig(hass))})`);
+    const r = C._resolve({ preset: 'nibe' }, hass); const e = r.entities;
+    check(r.ready && e.mode === 'sensor.prio_43086' && e.compressor === 'sensor.compressor_state_ep14_43427' && e.flow === 'sensor.bt2_supply_temp_s1_40008'
+      && e.return === 'sensor.eb100_ep14_bt3_return_temp_40012' && e.outdoor === 'sensor.bt1_outdoor_temperature_40004'
+      && e.primary_pump_state === 'sensor.supply_pump_state_ep14_43431' && e.heater === 'sensor.int_el_add_power_43084',
+    `NIBE core: prio, compressor state, BT2, BT3, BT1, supply pump, electric addition (${e.mode} / ${e.compressor} / ${e.flow})`);
+    check(e.dhw_top === 'sensor.bt7_hw_top_40013' && e.dhw_bottom === 'sensor.bt6_hw_load_40014' && e.source_in === 'sensor.bt20_exhaust_air_temp_1_40025'
+      && e.source_out === 'sensor.bt21_vented_air_temp_1_40026' && e.hc_setpoint === 'sensor.calc_supply_s1_43009' && e.program === 'select.holiday_activated_48043'
+      && e.room === undefined && e.compressor_speed === undefined && e.evap_temp === 'sensor.eb100_bt16_evaporator_temp_40020',
+    `NIBE F470: tank BT7/BT6, exhaust and vented air as the source, calculated supply, holiday; no room without BT50, no speed on a fixed-speed unit (${e.source_in} / ${e.room} / ${e.compressor_speed})`);
+    const findings = C._checks({ preset: 'nibe' }, hass, r).map((f) => `${f.key}:${f.code}`);
+    check(!findings.length, `NIBE: the mapping passes the plausibility checks (${findings.join(', ')})`);
+    const card = mount({ preset: 'nibe' }, hass); await wait(20);
+    const F = card._flowModel();
+    check(F.running && F.hp === 'heating' && !card.shadowRoot.getElementById('chip-err')?.classList.contains('on'),
+      `NIBE: heating while the compressor is RUNNING, alarm 183 (defrost) is no error (${F.hp})`);
+    card.hass = hassOf({ ...states, ...toStates({ 'sensor.prio_43086': 'HOT WATER', 'sensor.alarm_45001': '162' }) }, registry); await wait(5);
+    const dhw = card._flowModel();
+    const errOn = card.shadowRoot.getElementById('chip-err').classList.contains('on');
+    check(dhw.hp === 'dhw' && errOn, `NIBE: prio HOT WATER means hot water, alarm 162 is an error (${dhw.hp} / ${errOn})`);
+    card.hass = hassOf({ ...states, ...toStates({ 'sensor.prio_43086': 'OFF', 'sensor.compressor_state_ep14_43427': 'STOPPED', 'sensor.alarm_45001': '0' }) }, registry); await wait(5);
+    const idle = card._flowModel();
+    check(!idle.running && idle.hp === 'idle', `NIBE: prio OFF and STOPPED is idle (${idle.hp})`);
+    card.remove();
+    // Brine models (F1x55) take the brine sensors and the inverter frequency; a room sensor that reports gives the room.
+    const brine = { ...states, ...toStates({ 'sensor.eb100_ep14_bt10_brine_in_temp_40015': ['4.1', '°C'], 'sensor.eb100_ep14_bt11_brine_out_temp_40016': ['1.2', '°C'],
+      'sensor.compressor_frequency_actual_43136': ['48', 'Hz'], 'sensor.bt50_room_temp_s1_40033': ['21.4', '°C'] }) };
+    const rb = C._resolve({ preset: 'nibe' }, hassOf(brine, Object.fromEntries(Object.keys(brine).map((id) => [id, { platform: 'nibe_heatpump' }])))).entities;
+    check(rb.source_in === 'sensor.eb100_ep14_bt10_brine_in_temp_40015' && rb.source_out === 'sensor.eb100_ep14_bt11_brine_out_temp_40016'
+      && rb.compressor_speed === 'sensor.compressor_frequency_actual_43136' && rb.room === 'sensor.bt50_room_temp_s1_40033',
+    `NIBE brine models: BT10/BT11 before the exhaust air, compressor frequency, BT50 as the room (${rb.source_in} / ${rb.compressor_speed} / ${rb.room})`);
+    // The S series uses the same numbers for other coils: degree minutes 40012 or a foreign prio entity are no NIBE F series.
+    check(!detects('nibe', { 'sensor.degree_minutes_40012': '-120', 'sensor.prio_43086': 'HEAT' }, { 'sensor.degree_minutes_40012': { platform: 'nibe_heatpump' }, 'sensor.prio_43086': { platform: 'nibe_heatpump' } }),
+      'NIBE: prio alone without the compressor state is not detected');
+    check(!detects('nibe', { 'sensor.prio_43086': 'HEAT', 'sensor.compressor_state_ep14_43427': 'RUNNING' },
+      { 'sensor.prio_43086': { platform: 'mqtt' }, 'sensor.compressor_state_ep14_43427': { platform: 'mqtt' } }), 'NIBE: the same ids from another integration are not detected');
+  }
+  {
     const states = {}; const registry = {};
     const add = (domain, key, state) => {
       const id = `${domain}.vitocal_${key}`;
@@ -3473,7 +3523,7 @@
     check(o.samsung === 1 && o.ring === 0 && o.fans === 1 && o.ok, `Samsung preset draws the EHS Mono unit (${JSON.stringify(o)})`);
     // Automatic drawing per preset, as listed in the README table "Outdoor-unit style coverage" (#151). A new preset needs an entry here.
     const unitOf = { lambda: 'lambda', vicare: 'viessmann', open3e: 'viessmann', vaillant: 'vaillant', ebusd: 'vaillant', emsesp: 'bosch', bosch_buderus_heating: 'bosch',
-      heishamon: 'panasonic', samsung: 'samsung', wolf: 'wolf', kronoterm: 'kronoterm', luxtronik: 'alpha_innotec', stiebel_isg: 'stiebel', espaltherma: 'generic' };
+      heishamon: 'panasonic', samsung: 'samsung', wolf: 'wolf', kronoterm: 'kronoterm', luxtronik: 'alpha_innotec', stiebel_isg: 'stiebel', espaltherma: 'generic', nibe: 'generic' };
     const unitWrong = Object.keys(HFC_PRESETS).filter((p) => (HFC_PRESETS[p].unit_style || 'generic') !== unitOf[p]);
     check(!unitWrong.length, `every preset selects the outdoor-unit drawing the README lists (${unitWrong.join(', ') || 'all match'})`);
     check(Object.values(unitOf).every((s) => HFC_UNIT_STYLES.includes(s)), 'the expected drawings are valid unit_style values');
@@ -4817,7 +4867,7 @@
     card = await mountSetup('Kronoterm ADAPT');
     check(!!q(card, 'circle.pump[cx="720"]'), 'Kronoterm: the loop pump stays in the circuit next to the primary pump');
     card.remove();
-    check(Object.entries(HFC_PRESETS).filter(([, p]) => p.primary_pump).map(([k]) => k).sort().join() === 'espaltherma,heishamon,kronoterm,samsung', 'presets with a primary pump: ESPAltherma, HeishaMon, Kronoterm, Samsung');
+    check(Object.entries(HFC_PRESETS).filter(([, p]) => p.primary_pump).map(([k]) => k).sort().join() === 'espaltherma,heishamon,kronoterm,nibe,samsung', 'presets with a primary pump: ESPAltherma, HeishaMon, Kronoterm, NIBE, Samsung');
   }
 
   // 18p. hot-water standby loss (#32): cool-down in K/h only in verified standby windows, charging and draw-off excluded

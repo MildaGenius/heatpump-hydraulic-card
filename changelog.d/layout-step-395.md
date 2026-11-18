@@ -1,1 +1,0 @@
-- Drawing: labels that compete for room move to a free place instead of overlapping (#395, layout step). On narrow cards and with long texts the circuit title moves right next to a heating-curve target that reached it (and is shortened there if needed), and below 400 px the flow temperature under the pump moves clear of the mixer bypass. Normal cards look the same.

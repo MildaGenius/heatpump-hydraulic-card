@@ -28,6 +28,7 @@ The percentage says how complete a preset is, not how well it was tested: see th
 | [`emsesp`](#emsesp) | 100 % | – | `hc_return` | 22 of 49 | 20 of 29 | – | – | – |
 | [`heishamon`](#heishamon) | 92 % | `hc_pump` | `hc_return` | 20 of 49 | 17 of 29 | yes | – | – |
 | [`wolf`](#wolf) | 100 % | – | `hc_return` | 10 of 49 | 6 of 29 | – | – | de, en |
+| [`airahome`](#airahome) | 100 % | – | `hc_return` | 18 of 49 | 4 of 29 | yes | – | – |
 | [`kronoterm`](#kronoterm) | 100 % | – | `volume`, `hc_return` | 11 of 49 | 9 of 29 | yes | – | – |
 | [`luxtronik`](#luxtronik) | 93 % | `hc_return` | – | 20 of 49 | 15 of 29 | – | – | – |
 | [`stiebel_isg`](#stiebel_isg) | 100 % | – | `heat`, `hc_return` | 17 of 49 | 9 of 29 | yes | yes | – |
@@ -177,6 +178,23 @@ Wolf (wolflink, wolf_smartset). Core fields 100 %, stat tiles: `heat`, `heat_hea
 Not mapped:
 
 - `hc_return`: Both integrations report one return temperature, at the heat pump; no circuit has its own.
+
+### airahome
+
+Aira (ha-airahome). Core fields 100 %, stat tiles: `cop_total`, `spf`, `energy`, `heat`.
+
+| Area | Mapped | Shown without its own entity | Not mapped, with reason | Open |
+|---|---|---|---|---|
+| Heat pump | **`mode`**, **`compressor`**, `fan_speed`, `defrost`, **`power`**, **`heat`**, **`flow`**, **`return`**, **`volume`**, **`outdoor`**, `heater` | **`valve`** | – | `status`, `source_volume`, `source_in`, `source_out`, `brine_pressure`, `pv_boost` |
+| Tanks | **`dhw_top`**, **`dhw_target`**, `buffer_top` | – | `circulation` | `dhw_middle`, `dhw_bottom`, `dhw_mode`, `dhw_heater`, `buffer_middle`, `buffer_bottom`, `buffer_mode`, `buffer_heater`, `solar_collector`, `solar_pump` |
+| Heating circuit | **`hc_flow`**, `hc_setpoint`, `hc_mode`, **`hc_pump`**, **`room`**, `room_target`, `program` | – | **`hc_return`**, `hc_mixer` | `hc_volume`, `hc_curve_offset`, `hc_pressure` |
+| Details | `energy_total`, `heat_total`, `compressor_speed`, `evap_temp`, `cond_temp`, `suction_temp`, `hot_gas`, `low_pressure`, `high_pressure`, `eev` | – | – | `hours`, `starts_total`, `aux_hours`, `env_energy`, `liquid_temp`, `superheat`, `subcooling`, `cutout_high_pressure`, `cutout_low_pressure`, `cutout_temperature` |
+
+Not mapped:
+
+- `hc_return`: Each zone reports a supply temperature only.
+- `hc_mixer`: Zone N valve position is reported in %, but it is not documented whether it is a mixing or a zone valve.
+- `circulation`: No circulation pump entity.
 
 ### kronoterm
 

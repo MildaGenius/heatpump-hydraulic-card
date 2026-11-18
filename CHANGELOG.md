@@ -1,6 +1,8 @@
 # Changelog
 
 ## 0.20.0-beta.1 – 2026-11-18
+- New preset `airahome` for Aira heat pumps with the integration ha-airahome: active state as the mode (anti-legionella as hot water), compressor speed, defrost, power and heat, the outdoor unit's circulator as the primary pump, the buffer from the indoor unit supply temperature, tank, zones with supply, circulator and thermostat, away mode and alarms. Found by translation key, so the `ah_<id>_` ids do not matter (#417).
+- Drawing: labels that compete for room move to a free place instead of overlapping (#395, layout step). On narrow cards and with long texts the circuit title moves right next to a heating-curve target that reached it (and is shortened there if needed), and below 400 px the flow temperature under the pump moves clear of the mixer bypass. Normal cards look the same.
 - New entity `aux_starts`: the starts of the heater, shown in the details next to the heater hours. The Vaillant (myPyllant) and ViCare presets fill it; before, the heater starts were only a stat tile and could not be shown in the details (#1).
 - Start and hour counters that the integration reports as `state_class: measurement` (myPyllant On/Off Cycles and operation time) now give their stat tiles for today, the week, the month and the year: since they only count up, the card takes the period from their highest and lowest value in the long-term statistics. Before, only the total was shown (#1).
 - `docs/FAQ.md` answers which sensor the hot-water standby-loss tile needs.

@@ -46,6 +46,7 @@ Each entry names the brands, the preset with its setup page, the integration it 
 - **Samsung** EHS (Mono, Split, TDM) on the NASA bus: preset [`samsung`](docs/presets/samsung.md), integration [esphome-samsung-nasa](https://github.com/Beormund/esphome-samsung-nasa) (ESPHome). Tested on a real installation. Coverage [100 %](docs/COVERAGE.md#samsung).
 - **Samsung** EHS on the NASA bus with an RS485 bridge: preset [`ehs_sentinel`](docs/presets/ehs-sentinel.md), integration [EHS Sentinel](https://github.com/echoDaveD/ehs_sentinel_hacs_integration) (HACS). Untested (built from the integration's NASA repository and the entity list of one installation). Coverage [100 %](docs/COVERAGE.md#ehs_sentinel).
 - **Daikin** Altherma, **ROTEX** (Altherma 3, LT, EPRA, ERGA, EBLA …): preset [`espaltherma`](docs/presets/espaltherma.md), integration [ESPAltherma](https://github.com/raomin/ESPAltherma) (ESP32 on the X10A port, MQTT device discovery of the beta branch). Tested on a real installation (EPRA12EAV3, heating and hot water). Coverage [92 %](docs/COVERAGE.md#espaltherma), 1 open.
+- **Aira** (6, 8 and 12 kW): preset [`airahome`](docs/presets/airahome.md), integration [ha-airahome](https://github.com/Invy55/ha-airahome) (HACS, Bluetooth). Untested (built from the integration source and the entity list of one installation). Coverage [100 %](docs/COVERAGE.md#airahome).
 - **Any other heat pump**: no preset; the editor's mapping assistant or your own `entities` ([any other heat pump](#any-other-heat-pump)).
 
 Which preset should come next? Vote in the [poll](https://github.com/Sturmi77/heatpump-hydraulic-card/discussions/424) or name your heat pump there.
@@ -100,7 +101,7 @@ The current release is **[0.19.0](https://github.com/Sturmi77/heatpump-hydraulic
 
 Each `unit_style`, the unit its drawing is based on, the brands it covers and when it is selected automatically:
 
-- `generic`: neutral fan symbol for any air-source heat pump. Fallback without a known style, and the drawing of `preset: espaltherma` (Daikin Altherma has no drawing of its own yet) and `preset: nibe` (an exhaust air drawing is planned); ground and groundwater sources show their loop symbol instead.
+- `generic`: neutral fan symbol for any air-source heat pump. Fallback without a known style, and the drawing of `preset: espaltherma` (Daikin Altherma has no drawing of its own yet), `preset: nibe` (an exhaust air drawing is planned) and `preset: airahome`; ground and groundwater sources show their loop symbol instead.
 - `lambda`: Lambda EU-L. With `preset: lambda`.
 - `viessmann`: Viessmann Vitocal 250-A, for Viessmann Vitocal. With `preset: vicare` and `preset: open3e`.
 - `vaillant`: Vaillant aroTHERM plus, for Vaillant and as the default for the other myPyllant brands. With `preset: vaillant`.

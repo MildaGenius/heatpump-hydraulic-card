@@ -315,6 +315,114 @@
     check(!supported._form.schema.some((f) => f.name === 'assistant_device'), 'a detected preset keeps priority and suppresses the assistant');
     supported.remove();
   }
+  {
+    // #299: questions about the installation that the integration cannot answer, shown in the editor only while they change the
+    // drawing; an answer goes to the preview through the existing option, "I don't know" takes it back.
+    const vit = setups.find((s) => s.name === 'Viessmann Vitocal');
+    const vh = hassOf(toStates(vit.states('heat')), vit.registry || {});
+    const ids = (cfg) => C._layoutQuestions(cfg, vh, C._resolve(cfg, vh)).map((q) => `${q.id}${q.answered ? '=' : ''}`).join();
+    check(ids({ preset: 'vicare' }) === 'buffer', `#299: ViCare without buffer sensors asks about the buffer first (${ids({ preset: 'vicare' })})`);
+    check(ids({ preset: 'vicare', buffer: false }) === 'buffer=,primary_pump' && ids({ preset: 'vicare', buffer: false, primary_pump: true }) === 'buffer=,primary_pump=',
+      `#299: after "no buffer" the shared ViCare pump is the next question (${ids({ preset: 'vicare', buffer: false })})`);
+    check(ids({ preset: 'vicare', buffer: true }) === 'buffer=' && ids({ preset: 'vicare', buffer: false, hc_count: 2 }) === 'buffer='
+      && ids({ preset: 'vicare', storage: 'combined' }) === '' && ids({ preset: 'vicare', series_buffer: true }) === '',
+      '#299: no pump question with a buffer or two circuits, no buffer question with combined storage or a series buffer');
+    const lam = setups.find((s) => s.name === 'Lambda');
+    const lh = hassOf(toStates(lam.states('heat')), lam.registry || {});
+    check(C._layoutQuestions(lam.config, lh, C._resolve(lam.config, lh)).length === 0, '#299: no question where the integration reports a buffer (Lambda)');
+    check(C._layoutQuestions({ preset: 'vicare' }, hassOf({}), C._resolve({ preset: 'vicare' }, hassOf({}))).length === 0, '#299: no question before the preset finds the heat pump');
+
+    let out; let changed = 0;
+    const ed = document.createElement('heatpump-flow-card-editor');
+    ed.addEventListener('config-changed', (ev) => { changed++; out = ev.detail.config; });
+    ed.setConfig({ preset: 'vicare', hc_type: 'radiator' }); ed.hass = vh; await wait(20);
+    const choose = async (id, value) => {
+      const input = ed.querySelector(`input[data-hfc-layout-choice="${id}"][value="${value}"]`);
+      if (!input) return false;
+      input.checked = true; input.dispatchEvent(new Event('change', { bubbles: true })); await wait(10); return true;
+    };
+    const shown = () => [...ed.querySelectorAll('fieldset[data-hfc-layout]')].map((f) => f.dataset.hfcLayout).join();
+    check(shown() === 'buffer' && changed === 0 && ed.querySelector('input[data-hfc-layout-choice="buffer"][value="unknown"]').checked,
+      `#299: the editor shows the open question without writing anything (${shown()}, ${changed} changes)`);
+    await choose('buffer', 'no');
+    check(changed === 1 && out.buffer === false && shown() === 'buffer,primary_pump', `#299: "no buffer" is written and brings the pump question (${JSON.stringify(out)} / ${shown()})`);
+    const draw = (cfg) => { const c = mount(cfg, vh); return c; };
+    let card = draw(out); await wait(20);
+    const sharedDefault = card._primaryPump() && !card._circuitPump(1);
+    card.remove();
+    await choose('primary_pump', 'no');
+    card = draw(out); await wait(20);
+    const inCircuit = out.primary_pump === false && !card._primaryPump() && card._circuitPump(1);
+    card.remove();
+    check(sharedDefault && inCircuit, `#299: the pump answer moves the pump from the heat pump into the circuit in the preview (${sharedDefault} / ${inCircuit})`);
+    // Other fields keep the answer: the form writes buffer: false back unchanged.
+    ed._changed({ ...ed._form.data, title: 'Vitocal' }); await wait(10);
+    check(out.buffer === false && out.primary_pump === false && out.title === 'Vitocal', `#299: editing another field keeps both answers (${JSON.stringify(out)})`);
+    await choose('buffer', 'yes');
+    check(out.buffer === true && out.primary_pump === undefined && shown() === 'buffer', `#299: a buffer after all takes back the pump answer (${JSON.stringify(out)} / ${shown()})`);
+    await choose('buffer', 'unknown');
+    check(out.buffer === undefined && shown() === 'buffer' && !('buffer' in out), `#299: "I don't know" removes the option and keeps the question (${JSON.stringify(out)})`);
+    let roundTrip = true; try { const c = document.createElement('heatpump-flow-card'); c.setConfig({ preset: 'vicare', buffer: false, primary_pump: false }); } catch (err) { roundTrip = false; }
+    check(roundTrip, '#299: the answers are valid card options');
+    ed.remove();
+    // Opened again with saved answers, nothing is asked.
+    const again = document.createElement('heatpump-flow-card-editor');
+    again.setConfig({ preset: 'vicare', buffer: false, primary_pump: true }); again.hass = vh; await wait(20);
+    check(!again.querySelector('fieldset[data-hfc-layout]'), '#299: saved answers are not asked again');
+    again.remove();
+    // Open3E with circuits 2 to 4 and no circuit 1 (#269): the card would draw an empty first circuit.
+    const st = {}; const reg = {};
+    const add = (domain, key, state) => { const id = `${domain}.vitocal_${key}`; st[id] = state; reg[id] = { platform: 'open3e', translation_key: key }; };
+    add('sensor', 'refrigeration_circuit_mode', 'heating'); add('binary_sensor', 'heat_pump_compressor_active', 'on');
+    add('sensor', 'flow_temperature', '42'); add('sensor', 'return_temperature', '35'); add('sensor', 'dhw_buffer_top_temperature', '50');
+    [2, 3, 4].forEach((n) => { add('sensor', `flow_circuit${n}_temperature`, String(30 + n)); add('binary_sensor', `circuit_${n}_pump`, 'on'); });
+    const oh = hassOf(toStates(st), reg);
+    const stub = C.getStubConfig(oh);
+    const qs = C._layoutQuestions(stub, oh, C._resolve(stub, oh));
+    const cq = qs.find((q) => q.id === 'circuits');
+    check(cq && cq.first === 2 && cq.count === 3 && !cq.answered, `#299: Open3E circuits 2 to 4 without circuit 1 bring the circuit question (${JSON.stringify(cq)} / ${JSON.stringify(stub)})`);
+    const ce = document.createElement('heatpump-flow-card-editor');
+    let cout;
+    ce.addEventListener('config-changed', (ev) => { cout = ev.detail.config; });
+    ce.setConfig(stub); ce.hass = oh; await wait(20);
+    const legend = ce.querySelector('fieldset[data-hfc-layout="circuits"] legend')?.textContent || '';
+    const pick = async (value) => { const i = ce.querySelector(`input[data-hfc-layout-choice="circuits"][value="${value}"]`); i.checked = true; i.dispatchEvent(new Event('change', { bubbles: true })); await wait(10); };
+    await pick('yes');
+    const yes = cout;
+    const ccard = mount(yes, oh); await wait(20);
+    const flowYes = ccard._e.hc_flow;
+    ccard.remove();
+    await pick('unknown');
+    check(/circuits 2 to 4/.test(legend) && yes.index?.hc === 2 && yes.hc_count === 3 && flowYes === 'sensor.vitocal_flow_circuit2_temperature',
+      `#299: "yes" starts the card at circuit 2 with three circuits (${legend} / ${JSON.stringify(yes)} / ${flowYes})`);
+    check(cout.index === undefined && cout.hc_count === stub.hc_count, `#299: "I don't know" restores the circuit count (${JSON.stringify(cout)})`);
+    ce.remove();
+    // Codex review: myPyllant counts circuits from 0, and with two homes the question looks at the selected one only.
+    const mp = {}; const mreg = {};
+    const madd = (id, state, unit) => { mp[id] = unit ? [state, unit] : state; mreg[id] = { platform: 'mypyllant' }; };
+    madd('sensor.home_system_flow_temperature', '35', '°C'); madd('sensor.home_circuit_1_current_flow_temperature', '33', '°C'); madd('sensor.home_circuit_2_current_flow_temperature', '31', '°C');
+    madd('sensor.other_system_flow_temperature', '36', '°C'); madd('sensor.other_circuit_0_current_flow_temperature', '34', '°C');
+    const mh = hassOf(toStates(mp), mreg);
+    const vq = (cfg) => C._layoutQuestions(cfg, mh, C._resolve(cfg, mh)).find((q) => q.id === 'circuits');
+    const home = vq({ preset: 'vaillant', prefix: 'home' });
+    check(home && home.base === 0 && home.first === 1 && home.count === 2 && !vq({ preset: 'vaillant', prefix: 'other' }),
+      `myPyllant: circuits 1 and 2 without circuit 0 in the selected home, none for the other home (${JSON.stringify(home)})`);
+    const ve = document.createElement('heatpump-flow-card-editor');
+    let vout;
+    ve.addEventListener('config-changed', (ev) => { vout = ev.detail.config; });
+    ve.setConfig({ preset: 'vaillant', prefix: 'home' }); ve.hass = mh; await wait(20);
+    const vlegend = ve.querySelector('fieldset[data-hfc-layout="circuits"] legend')?.textContent || '';
+    const vpick = async (value) => { const i = ve.querySelector(`input[data-hfc-layout-choice="circuits"][value="${value}"]`); i.checked = true; i.dispatchEvent(new Event('change', { bubbles: true })); await wait(10); return { ...vout }; };
+    const vyes = await vpick('yes'); const vno = await vpick('no');
+    const vflow = C._resolve(vyes, mh).entities.hc_flow;
+    check(/circuits 1 to 2, but no circuit 0/.test(vlegend) && vyes.index?.hc === 1 && vyes.hc_count === 2 && vflow === 'sensor.home_circuit_1_current_flow_temperature' && vno.index?.hc === 0,
+      `myPyllant: "yes" starts at circuit 1, "no" keeps circuit 0 (${vlegend} / ${JSON.stringify(vyes)} / ${vflow} / ${JSON.stringify(vno)})`);
+    ve.remove();
+    add('sensor', 'flow_circuit1_temperature', '38'); add('binary_sensor', 'circuit_1_pump', 'on');
+    const withOne = hassOf(toStates(st), reg);
+    check(!C._layoutQuestions({ preset: 'open3e', hc_count: 4 }, withOne, C._resolve({ preset: 'open3e', hc_count: 4 }, withOne)).some((q) => q.id === 'circuits'),
+      '#299: no circuit question where circuit 1 exists');
+  }
   const stub = (states, registry) => C.getStubConfig(hassOf(toStates(states), registry));
   const expect = { 0: 'lambda', 1: 'lambda', 2: 'vicare', 3: 'vaillant', 4: 'emsesp', 5: 'heishamon', 6: 'emsesp', 8: 'wolf', 9: 'kronoterm', 10: 'ebusd', 11: 'samsung', 12: 'luxtronik', 15: 'stiebel_isg' };
   for (const [i, p] of Object.entries(expect)) {

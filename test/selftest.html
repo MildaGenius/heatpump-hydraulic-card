@@ -1476,6 +1476,82 @@
     check(!detects('espaltherma', { 'sensor.althermasensors': 'Online' }, { 'sensor.althermasensors': { platform: 'mqtt' } }), 'ESPAltherma: the attribute sensor alone is not detected');
   }
   {
+    // #417: Aira 6 kW with ha-airahome, nigelm's entity ids and values while heating. Entities by translation key (platform airahome).
+    const states = {}; const registry = {};
+    const add = (id, tk, state, unit, attrs) => {
+      states[id] = { entity_id: id, state, attributes: { ...(unit ? { unit_of_measurement: unit } : {}), ...(attrs || {}) } };
+      registry[id] = { platform: 'airahome', translation_key: tk };
+    };
+    add('sensor.ah_3e2_hp_active_state', 'active_state', 'heating');
+    add('sensor.ah_3e2_ou_compressor_speed', 'ou_compressor_speed', '30', 'Hz');
+    add('sensor.ah_3e2_ou_fan_1_speed', 'ou_fan_1_speed', '560', 'rpm');
+    add('binary_sensor.ah_3e2_defrosting', 'defrosting', 'off');
+    add('sensor.ah_3e2_instant_power_consumption_kw', 'instant_power_kw', '0.637', 'kW');
+    add('sensor.ah_3e2_instant_heat_production_kw', 'instant_heat_kw', '2.872', 'kW');
+    add('sensor.ah_3e2_ou_supply_temperature', 'ou_supply_temp', '31.2', '°C');
+    add('sensor.ah_3e2_ou_return_temperature', 'ou_return_temp', '29.8', '°C');
+    add('sensor.ah_3e2_primary_circuit_flow', 'flow_meter_1', '29.4', 'L/min');
+    add('binary_sensor.ah_3e2_ou_primary_circulator', 'ou_pump', 'on');
+    add('sensor.ah_3e2_outdoor_temperature', 'outdoor_temp', '4.2', '°C');
+    add('binary_sensor.ah_3e2_inline_heater', 'inline_heater', 'off');
+    add('sensor.ah_3e2_dhw_temperature', 'hot_water_temp', '55.5', '°C');
+    add('water_heater.ah_3e2_dhw_tank', 'water_heater', 'off', null, { temperature: 50, current_temperature: 55.5 });
+    add('sensor.ah_3e2_indoor_unit_supply_temperature', 'indoor_supply_temp', '30.6', '°C');
+    add('sensor.ah_3e2_zone_1_supply_temperature', 'zone_1_supply_temp', '29.9', '°C');
+    add('sensor.ah_3e2_zone_1_calculated_supply_temperature', 'zone_1_calculated_supply_temp', '28.1', '°C');
+    add('sensor.ah_3e2_hp_zone_1_state', 'zone_1_active_state', 'heating_cooling');
+    add('binary_sensor.ah_3e2_zone_1_circulator', 'zone_1_circulator', 'on');
+    add('sensor.ah_3e2_zone_1_temperature', 'zone_1_temp', '20.0', '°C');
+    add('climate.ah_3e2_zone_1', 'zone_1_climate', 'heat', null, { temperature: 19.5, current_temperature: 20 });
+    add('binary_sensor.ah_3e2_away_mode', 'away_mode', 'off');
+    add('sensor.ah_3e2_total_electricity_consumption_kwh', 'electricity_kwh', '575.8', 'kWh');
+    add('sensor.ah_3e2_total_heat_produced_kwh', 'heat_kwh', '1802.629', 'kWh');
+    add('sensor.ah_3e2_ou_evaporating_temperature', 'evaporating_temp', '-0.4', '°C');
+    add('sensor.ah_3e2_ou_condensing_temperature', 'condensing_temp', '31.5', '°C');
+    add('sensor.ah_3e2_ou_evaporator_pressure', 'ou_evaporator_pressure', '3.6', 'bar');
+    add('sensor.ah_3e2_ou_condenser_pressure', 'ou_condenser_pressure', '10.2', 'bar');
+    add('sensor.ah_3e2_electronic_expansion_valve_step', 'eev_step', '398');
+    add('binary_sensor.ah_3e2_alarms', 'alarms', 'off');
+    const hass = hassOf(states, registry);
+    check(C.getStubConfig(hass).preset === 'airahome', `Aira is detected (${JSON.stringify(C.getStubConfig(hass))})`);
+    const r = C._resolve({ preset: 'airahome' }, hass); const e = r.entities;
+    check(r.ready && e.mode === 'sensor.ah_3e2_hp_active_state' && e.compressor === 'sensor.ah_3e2_ou_compressor_speed' && e.flow === 'sensor.ah_3e2_ou_supply_temperature'
+      && e.return === 'sensor.ah_3e2_ou_return_temperature' && e.volume === 'sensor.ah_3e2_primary_circuit_flow' && e.power === 'sensor.ah_3e2_instant_power_consumption_kw'
+      && e.heat === 'sensor.ah_3e2_instant_heat_production_kw' && e.primary_pump_state === 'binary_sensor.ah_3e2_ou_primary_circulator',
+    `Aira core: active state, compressor Hz, outdoor unit supply and return, primary flow, power, heat, circulator (${e.mode} / ${e.flow})`);
+    check(e.buffer_top === 'sensor.ah_3e2_indoor_unit_supply_temperature' && e.dhw_top === 'sensor.ah_3e2_dhw_temperature' && e.dhw_target === 'water_heater.ah_3e2_dhw_tank'
+      && e.hc_flow === 'sensor.ah_3e2_zone_1_supply_temperature' && e.hc_pump === 'binary_sensor.ah_3e2_zone_1_circulator' && e.room_target === 'climate.ah_3e2_zone_1'
+      && e.program === 'binary_sensor.ah_3e2_away_mode',
+    `Aira: buffer from the indoor unit supply, tank and its target, zone 1 supply, circulator and thermostat, away mode (${e.buffer_top} / ${e.dhw_target})`);
+    const findings = C._checks({ preset: 'airahome' }, hass, r).map((f) => `${f.key}:${f.code}`);
+    check(!findings.length, `Aira: the mapping passes the plausibility checks (${findings.join(', ')})`);
+    const card = mount({ preset: 'airahome' }, hass); await wait(20);
+    const F = card._flowModel();
+    check(F.running && F.hp === 'heating' && !card.shadowRoot.getElementById('chip-err')?.classList.contains('on'),
+      `Aira: heating while the compressor turns, alarms off is no error (${F.hp})`);
+    for (const [raw, want] of [['dhw', 'dhw'], ['anti_legionella', 'dhw'], ['defrosting', 'defrost'], ['idle', 'idle']]) {
+      states['sensor.ah_3e2_hp_active_state'] = { entity_id: 'sensor.ah_3e2_hp_active_state', state: raw, attributes: {} };
+      if (raw === 'idle') states['sensor.ah_3e2_ou_compressor_speed'] = { entity_id: 'sensor.ah_3e2_ou_compressor_speed', state: '0', attributes: { unit_of_measurement: 'Hz' } };
+      card.hass = hassOf({ ...states }, registry); await wait(5);
+      check(card._flowModel().hp === want, `Aira: active state ${raw} is ${want} (${card._flowModel().hp})`);
+    }
+    states['binary_sensor.ah_3e2_alarms'] = { entity_id: 'binary_sensor.ah_3e2_alarms', state: 'on', attributes: {} };
+    card.hass = hassOf({ ...states }, registry); await wait(5);
+    check(card.shadowRoot.getElementById('chip-err').classList.contains('on'), 'Aira: alarms on shows the error chip');
+    card.remove();
+    // Codex review: with hc_count 2, zone 2 gets its own room, target and humidity.
+    add('sensor.ah_3e2_zone_2_supply_temperature', 'zone_2_supply_temp', '27.5', '°C');
+    add('binary_sensor.ah_3e2_zone_2_circulator', 'zone_2_circulator', 'on');
+    add('sensor.ah_3e2_zone_2_temperature', 'zone_2_temp', '18.5', '°C');
+    add('sensor.ah_3e2_zone_2_humidity', 'zone_2_humidity', '55', '%');
+    add('climate.ah_3e2_zone_2', 'zone_2_climate', 'heat', null, { temperature: 18, current_temperature: 18.5 });
+    const z2 = C._resolve({ preset: 'airahome', hc_count: 2 }, hassOf({ ...states }, registry)).entities;
+    check(z2.hc2_flow === 'sensor.ah_3e2_zone_2_supply_temperature' && z2.hc2_room === 'sensor.ah_3e2_zone_2_temperature'
+      && z2.hc2_room_target === 'climate.ah_3e2_zone_2' && z2.hc2_room_humidity === 'sensor.ah_3e2_zone_2_humidity' && z2.room === 'sensor.ah_3e2_zone_1_temperature',
+    `Aira: zone 2 has its own room, target and humidity (${z2.hc2_room} / ${z2.hc2_room_target} / ${z2.hc2_room_humidity})`);
+    check(!detects('airahome', { 'sensor.x_active_state': 'heating' }, { 'sensor.x_active_state': { platform: 'other', translation_key: 'active_state' } }), 'Aira: an active state of another platform is not Aira');
+  }
+  {
     // #403: Samsung EHS with EHS Sentinel, the ids and values of ColinSainsbury's installation while heating (default instance name).
     const p = 'samsung_ehssentinel';
     const states = toStates(Object.fromEntries(Object.entries({
@@ -3705,7 +3781,7 @@
     check(o.samsung === 1 && o.ring === 0 && o.fans === 1 && o.ok, `Samsung preset draws the EHS Mono unit (${JSON.stringify(o)})`);
     // Automatic drawing per preset, as listed in the README table "Outdoor-unit style coverage" (#151). A new preset needs an entry here.
     const unitOf = { lambda: 'lambda', vicare: 'viessmann', open3e: 'viessmann', vaillant: 'vaillant', ebusd: 'vaillant', emsesp: 'bosch', bosch_buderus_heating: 'bosch',
-      heishamon: 'panasonic', samsung: 'samsung', wolf: 'wolf', kronoterm: 'kronoterm', luxtronik: 'alpha_innotec', stiebel_isg: 'stiebel', espaltherma: 'generic', ehs_sentinel: 'samsung', nibe: 'generic' };
+      heishamon: 'panasonic', samsung: 'samsung', wolf: 'wolf', kronoterm: 'kronoterm', luxtronik: 'alpha_innotec', stiebel_isg: 'stiebel', espaltherma: 'generic', ehs_sentinel: 'samsung', airahome: 'generic', nibe: 'generic' };
     const unitWrong = Object.keys(HFC_PRESETS).filter((p) => (HFC_PRESETS[p].unit_style || 'generic') !== unitOf[p]);
     check(!unitWrong.length, `every preset selects the outdoor-unit drawing the README lists (${unitWrong.join(', ') || 'all match'})`);
     check(Object.values(unitOf).every((s) => HFC_UNIT_STYLES.includes(s)), 'the expected drawings are valid unit_style values');
@@ -5159,7 +5235,7 @@
     card = await mountSetup('Kronoterm ADAPT');
     check(!!q(card, 'circle.pump[cx="720"]'), 'Kronoterm: the loop pump stays in the circuit next to the primary pump');
     card.remove();
-    check(Object.entries(HFC_PRESETS).filter(([, p]) => p.primary_pump).map(([k]) => k).sort().join() === 'ehs_sentinel,espaltherma,heishamon,kronoterm,nibe,samsung', 'presets with a primary pump: EHS Sentinel, ESPAltherma, HeishaMon, Kronoterm, NIBE, Samsung');
+    check(Object.entries(HFC_PRESETS).filter(([, p]) => p.primary_pump).map(([k]) => k).sort().join() === 'airahome,ehs_sentinel,espaltherma,heishamon,kronoterm,nibe,samsung', 'presets with a primary pump: Aira, EHS Sentinel, ESPAltherma, HeishaMon, Kronoterm, NIBE, Samsung');
   }
 
   // 18p. hot-water standby loss (#32): cool-down in K/h only in verified standby windows, charging and draw-off excluded

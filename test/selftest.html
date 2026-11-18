@@ -4848,6 +4848,36 @@
     card.remove();
   }
 
+  // 18e3. #395 stage 3: the layout step moves a label with alternatives to the first place clear of the named parts, shortens it with
+  // "fit" when none is free, and leaves it at home when nothing is in the way.
+  {
+    const s = setups.find((x) => x.name === 'Lambda' && x.config.preset === 'lambda');
+    const card = mount(s.config, hassOf(toStates(s.states('heat')), s.registry || {}, s.energy, s)); await wait(30);
+    const svg = card.shadowRoot.getElementById('svg');
+    const NS = 'http://www.w3.org/2000/svg';
+    const text = (id, x, y, anchor, content, extra = {}) => {
+      const el = document.createElementNS(NS, 'text');
+      Object.entries({ id, x, y, 'text-anchor': anchor, class: 'pipe-label', ...extra }).forEach(([k, v]) => el.setAttribute(k, v));
+      el.textContent = content; svg.append(el); return el;
+    };
+    const fixed = text('t-test-fixed', 300, 40, 'start', 'Target 35 °C');
+    const free = text('t-test-free', 330, 40, 'start', 'Circuit', { 'data-avoid': 't-test-fixed', 'data-alt': '700 start' });
+    const home = text('t-test-home', 300, 90, 'start', 'Alone', { 'data-avoid': 't-test-fixed', 'data-alt': '700 start' });
+    const squeeze = text('t-test-fit', 330, 140, 'start', 'A very long circuit name that does not fit', { 'data-avoid': 't-test-wall', 'data-alt': '520 end fit', 'data-fit': '400' });
+    text('t-test-wall', 300, 140, 'start', 'Wall label');
+    card._placeLabels();
+    check(free.getAttribute('x') === '700' && free.dataset.placed === '1', `#395: a label in the way of another moves to its first free alternative (${free.getAttribute('x')} / ${free.dataset.placed})`);
+    check(home.getAttribute('x') === '300' && home.dataset.placed === '0', '#395: a label with nothing in the way stays at home');
+    const wall = card.shadowRoot.getElementById('t-test-wall').getBBox();
+    const fb = squeeze.getBBox();
+    check(squeeze.getAttribute('text-anchor') === 'end' && /…$/.test(squeeze.textContent) && fb.x >= wall.x + wall.width + HFC_LABEL_GAP,
+      `#395: "fit" shortens the label to the room beside the part in its way (${squeeze.textContent} / ${fb.x.toFixed(1)} vs ${(wall.x + wall.width).toFixed(1)})`);
+    fixed.remove();
+    card._placeLabels();
+    check(free.getAttribute('x') === '330', '#395: once the part is gone the label returns to its own place');
+    card.remove();
+  }
+
   // 18f. HeishaMon: refrigerant temperatures and the superheat computed from them
   {
     const p = 'panasonic_heat_pump';

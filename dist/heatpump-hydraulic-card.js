@@ -2964,6 +2964,8 @@ const HFC_LOSS = { hours: 48, minWindow: 3, settle: 0.5, drawOff: 1.5, rise: 1.0
 // Runs of the timeline: a standstill of `seriesGap` minutes or more starts a new series; a stretch without data shorter than
 // `dataGap` minutes between two running states does not end a run (a Modbus timeout or an integration reload).
 const HFC_RUNS = { seriesGap: 60, dataGap: 2 };
+// Least gap between two labels in schematic units, or they read as one text (#395; the same as LABEL_GAP of the drawing tests).
+const HFC_LABEL_GAP = 2;
 // Tiles counted from the recorder history (#407): the periods it keeps (about ten days by default), and the seconds after a defrost
 // in which a counter step still belongs to it (the counter can be published a moment after the defrost flag).
 const HFC_HISTORY_COUNT = { periods: ['today', 'yesterday', 'week'], grace: 60 };
@@ -4565,6 +4567,78 @@ class HeatpumpFlowCard extends HTMLElement {
     }
     el._fit = { font, max, full, shown: el.textContent };
   }
+  // Layout step (#395, stage 3): instead of a fixed coordinate a label can name places to go (data-alt) and the parts it must keep
+  // clear of (data-avoid: ids of labels or pipes in the drawing). After the widths are fitted the card measures it at its own place
+  // and then at each alternative, and keeps the first where it stays HFC_LABEL_GAP units from every visible part (and lies on no
+  // pipe). An alternative is "x anchor", several separated by ";"; one ending in "fit" shortens the label to the room up to the
+  // nearest part instead. Without a free place the label keeps its own. The same rules as the drawing tests: schematic units,
+  // text height from the font size.
+  _placeLabels() {
+    const svg = this._rendered && this._$('svg'); if (!svg) return;
+    const items = svg.querySelectorAll('text[data-alt]');
+    if (!items.length) return;
+    let root;
+    try { root = svg.getScreenCTM().inverse(); } catch (err) { return; }
+    const matrix = (el) => { try { return root.multiply(el.getScreenCTM()); } catch (err) { return null; } };
+    const visible = (el) => !!el && el.getClientRects().length > 0 && getComputedStyle(el).visibility === 'visible';
+    const box = (el) => {
+      let b; try { b = el.getBBox(); } catch (err) { return null; }
+      const m = matrix(el); if (!m || !(b.width > 0)) return null;
+      let top = b.y; let bottom = b.y + b.height;
+      const chars = el.getNumberOfChars ? el.getNumberOfChars() : 0;
+      if (chars) {
+        const size = Math.max(...[el, ...el.querySelectorAll('tspan')].map((n) => parseFloat(getComputedStyle(n).fontSize)).filter(Number.isFinite));
+        top = Infinity; bottom = -Infinity;
+        for (let n = 0; n < chars; n++) {
+          let y; try { ({ y } = el.getStartPositionOfChar(n)); } catch (err) { continue; }
+          top = Math.min(top, y - 0.72 * size); bottom = Math.max(bottom, y + 0.22 * size);
+        }
+        if (!Number.isFinite(top)) { top = b.y; bottom = b.y + b.height; }
+      }
+      const pts = [b.x, b.x + b.width].flatMap((x) => [top, bottom].map((y) => new DOMPoint(x, y).matrixTransform(m)));
+      return { l: Math.min(...pts.map((p) => p.x)), r: Math.max(...pts.map((p) => p.x)), t: Math.min(...pts.map((p) => p.y)), b: Math.max(...pts.map((p) => p.y)) };
+    };
+    const dots = (pipe) => {
+      const m = matrix(pipe); if (!m) return [];
+      const r = parseFloat(getComputedStyle(pipe).strokeWidth) / 2 || 2;
+      let len = 0; try { len = pipe.getTotalLength(); } catch (err) { return []; }
+      const out = [];
+      for (let at = 0; at <= len; at += 4) { const { x, y } = pipe.getPointAtLength(at).matrixTransform(m); out.push({ l: x - r, r: x + r, t: y - r, b: y + r }); }
+      return out;
+    };
+    const overlap = (a, b, gap) => Math.min(a.r, b.r) - Math.max(a.l, b.l) > gap && Math.min(a.b, b.b) - Math.max(a.t, b.t) > gap;
+    for (const el of items) {
+      const obstacles = el.dataset.avoid.split(/\s+/).map((id) => this._$(id)).filter(visible).map((o) => (o.tagName === 'path'
+        ? { pipe: true, parts: dots(o) } : { pipe: false, parts: [box(o)].filter(Boolean) }));
+      // Labels keep the gap; a pipe may not be touched (the drawing tests: more than 1 unit of overlap with its stroke).
+      const clear = (b) => obstacles.every((o) => o.parts.every((p) => !overlap(b, p, o.pipe ? 1 : -HFC_LABEL_GAP)));
+      const home = el._home || (el._home = { x: el.getAttribute('x'), anchor: el.getAttribute('text-anchor') || 'start' });
+      const places = [home, ...el.dataset.alt.split(';').map((s) => s.trim().split(/\s+/)).filter((p) => p[0])
+        .map(([x, anchor, fit]) => ({ x, anchor: anchor || home.anchor, fit: fit === 'fit' }))];
+      const put = (p) => {
+        el.setAttribute('x', p.x); el.setAttribute('text-anchor', p.anchor);
+        el.querySelectorAll('tspan[x]').forEach((t) => t.setAttribute('x', p.x));
+      };
+      let done = false;
+      for (const p of places) {
+        put(p);
+        let b = box(el);
+        if (p.fit && b && !clear(b)) {
+          // The room up to the nearest part on the side the label grows to, among the parts beside it.
+          const beside = obstacles.flatMap((o) => o.parts).filter((q) => Math.min(b.b, q.b) - Math.max(b.t, q.t) > -HFC_LABEL_GAP);
+          const x = parseFloat(p.x);
+          const room = p.anchor === 'end'
+            ? x - Math.max(...beside.filter((q) => q.l < x).map((q) => q.r)) - HFC_LABEL_GAP - 1
+            : Math.min(...beside.filter((q) => q.r > x).map((q) => q.l)) - x - HFC_LABEL_GAP - 1;
+          if (Number.isFinite(room) && room > 0) { this._fitText(el, Math.min(room, parseFloat(el.dataset.fit) || room)); b = box(el); }
+        }
+        if (!b || clear(b)) { done = true; break; }
+      }
+      if (!done) put(home);
+      el.dataset.placed = done ? String(places.findIndex((p) => p.x === el.getAttribute('x') && p.anchor === el.getAttribute('text-anchor'))) : 'none';
+    }
+  }
+
   // Label whose tail (for example the humidity after the room target) the narrow focus view hides; a narrow schematic also hides
   // the humidity after the room target, which is wider than the house there.
   _txtTail(id, main, tail) {
@@ -5599,7 +5673,7 @@ class HeatpumpFlowCard extends HTMLElement {
     ? `<g class="tap" ${de(k('curve_offset'))}>${this._parts.buffer || this._hcCount > 1
       ? `<text class="pipe-label" id="t-hc${s}" x="${this._hcCount > 1 ? 688 : 648}" y="316" text-anchor="start" data-lines="2"></text>`
       : `<text class="pipe-label" id="t-hc${s}" x="736" y="334" text-anchor="end"></text>`}</g>
-      <g class="tap" ${de(k('flow'))}><text class="pipe-label" id="t-hc-now${s}" x="720" y="396" text-anchor="middle"></text></g>`
+      <g class="tap" ${de(k('flow'))}><text class="pipe-label" id="t-hc-now${s}" x="720" y="396" text-anchor="middle"${this._mixerSvg(n) ? ` data-avoid="p-hc-mix${s}" data-alt="753 end"` : ''}></text></g>`
     : `<g class="tap" ${de(k('flow'))}>${this._hcCount > 1
       ? `<text class="pipe-label" id="t-hc${s}" x="688" y="334" text-anchor="start"></text>`
       : `<text class="pipe-label" id="t-hc${s}" x="740" y="334" text-anchor="middle"></text>`}</g>`}
@@ -5618,7 +5692,7 @@ class HeatpumpFlowCard extends HTMLElement {
       <g class="tap" ${de(e[k('pump')] ? k('pump') : k('mode'))}>
         ${this._circuitPump(n) ? `<circle class="pump" cx="720" cy="360" r="16"/>
         <g class="impeller" id="impeller${s}"><path d="M720 348 L726 360 L714 360Z M720 372 L714 360 L726 360Z" class="imp"/></g>` : ''}
-        <text class="tank-title" x="880" y="302" text-anchor="middle" data-fit="230">${title}</text>
+        <text class="tank-title" id="t-hc-title${s}" x="880" y="302" text-anchor="middle" data-fit="230" data-avoid="t-hc${s}" data-alt="990 end; 990 end fit">${title}</text>
         <text class="small" id="t-hc-mode${s}" x="880" y="524" text-anchor="middle"></text>
       </g>
     </g>`;
@@ -7349,6 +7423,7 @@ class HeatpumpFlowCard extends HTMLElement {
   _update() {
     this._updateDrawing();
     this._fitLabels();
+    this._placeLabels();
   }
 
   _updateDrawing() {

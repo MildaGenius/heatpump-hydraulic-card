@@ -1,0 +1,1 @@
+- Run panel: a period under a minute that folds into its neighbour (0.20.0-beta.1) no longer appears in the time per kind, so a hot-water charge with its short heating tail reads "Hot water 33 min", not "Hot water 33 min · Heating < 1 min". A defrost inside the run keeps its own line (#173).

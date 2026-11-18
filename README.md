@@ -33,7 +33,7 @@ Each entry names the brands, the preset with its setup page, the integration it 
 - **Lambda** (EU-L series): preset [`lambda`](docs/presets/lambda.md), integration [lambda_heat_pumps](https://github.com/GuidoJeuken-6512/lambda_heat_pumps) (HACS). Tested on a real installation. Coverage [100 %](docs/COVERAGE.md#lambda).
 - **Panasonic** Aquarea (H, J, K, L generation; monoblock, split, all-in-one): preset [`heishamon`](docs/presets/heishamon.md), integration [HeishaMon](https://github.com/heishamon/HeishaMon) with [heishamon-homeassistant](https://github.com/kamaradclimber/heishamon-homeassistant) (HACS). Confirmed on a real installation. Coverage [92 %](docs/COVERAGE.md#heishamon), 1 open.
 - **Kronoterm** (ADAPT, ETERA, VERSI, WPLV …): preset [`kronoterm`](docs/presets/kronoterm.md), integration [Kronoterm](https://github.com/Favio25/Kronoterm-homeassistant) (HACS), Cloud API or Modbus. Cloud API confirmed on a real installation; Modbus from the integration source. Coverage [100 %](docs/COVERAGE.md#kronoterm).
-- **Viessmann** (Vitocal): preset [`vicare`](docs/presets/vicare.md), integration [ViCare](https://www.home-assistant.io/integrations/vicare/) (core). Tested on real installations (Vitocal 250, Vitocal 200-S). Coverage [75 %](docs/COVERAGE.md#vicare), 3 open.
+- **Viessmann** (Vitocal): preset [`vicare`](docs/presets/vicare.md), integration [ViCare](https://www.home-assistant.io/integrations/vicare/) (core). Tested on real installations (Vitocal 250, Vitocal 200-S). Coverage [76 %](docs/COVERAGE.md#vicare), 3 open.
 - **Viessmann** (Vitocal): preset [`open3e`](docs/presets/open3e.md), integration [Open3E](https://github.com/MojoOli/open3e-ha) (HACS, MQTT). Confirmed on a real installation (two heating circuits). Coverage [92 %](docs/COVERAGE.md#open3e), 1 open.
 - **Vaillant** (aroTHERM, aroTHERM plus), **Saunier Duval**, **Bulex**, **Glow-worm**, **DemirDöküm**: preset [`vaillant`](docs/presets/vaillant.md), integration [myPyllant](https://github.com/signalkraft/mypyllant-component) (HACS). Confirmed on one aroTHERM plus installation. Coverage [100 %](docs/COVERAGE.md#vaillant).
 - **Bosch**, **Buderus**, **Junkers**, **Nefit**, **Worcester**, **Sieger**, **elm.leblanc**, **iVT** (EMS/EMS+ heat pumps such as Buderus Logatherm WLW, Bosch Compress, Nefit EnviLine): preset [`emsesp`](docs/presets/emsesp.md), integration [EMS-ESP](https://github.com/emsesp/EMS-ESP32) gateway (MQTT discovery). Confirmed on a Buderus Logatherm WLW186i installation. Coverage [100 %](docs/COVERAGE.md#emsesp).
@@ -41,10 +41,10 @@ Each entry names the brands, the preset with its setup page, the integration it 
 - **Vaillant** aroTHERM / aroTHERM plus (HMU) with a VWZ hydraulic station and sensoCOMFORT / multiMATIC controller: preset [`ebusd`](docs/presets/ebusd.md), integration [ebusd](https://github.com/john30/ebusd) with Home Assistant MQTT discovery. Tested on real installations (aroTHERM plus cascade with two circuits, aroTHERM plus with a buffer). Coverage [100 %](docs/COVERAGE.md#ebusd).
 - **Wolf** air/water heat pumps (CHA monoblock) with a WOLF Link gateway: preset [`wolf`](docs/presets/wolf.md), integration [Wolf SmartSet Service](https://www.home-assistant.io/integrations/wolflink/) (core, `wolflink`) or [Wolf SmartSet (read/write)](https://github.com/tibuntu/homeassistant-wolf-smartset) (HACS, `wolf_smartset`). `wolf_smartset` confirmed on a real installation (CHA); `wolflink` from the entity states of the same installation. Coverage [100 %](docs/COVERAGE.md#wolf).
 - **Alpha Innotec**, **Novelan**, **Roth**, **Siemens**, **Elco**, **Buderus**, **Nibe**, **Wolf** heat pumps with a Luxtronik controller: preset [`luxtronik`](docs/presets/luxtronik.md), integration [Luxtronik](https://github.com/BenPru/luxtronik) (HACS, `luxtronik2`). Confirmed on one water-to-water installation; air and brine reports welcome. Coverage [93 %](docs/COVERAGE.md#luxtronik), 1 open.
-- **NIBE** F series (F370, F470, F730, F750 exhaust air; F1145, F1155, F1245, F1255 brine): preset [`nibe`](docs/presets/nibe.md), integration [NIBE Heat Pump](https://www.home-assistant.io/integrations/nibe_heatpump/) (core, local Modbus or NIBE gateway). Untested (built from the integration's coil lists and an F470 entity list). Coverage [0 %](docs/COVERAGE.md#nibe).
+- **NIBE** F series (F370, F470, F730, F750 exhaust air; F1145, F1155, F1245, F1255 brine): preset [`nibe`](docs/presets/nibe.md), integration [NIBE Heat Pump](https://www.home-assistant.io/integrations/nibe_heatpump/) (core, local Modbus or NIBE gateway). Untested (built from the integration's coil lists and an F470 entity list). Coverage [80 %](docs/COVERAGE.md#nibe), 2 open.
 - **Stiebel Eltron** (WPM 3, WPM 3i, WPMsystem, LWZ) and **Tecalor** heat pumps with an ISG: preset [`stiebel_isg`](docs/presets/stiebel-isg.md), integration [Stiebel Eltron ISG](https://github.com/pail23/stiebel_eltron_isg_component) (HACS, `stiebel_eltron_isg`). Confirmed on a WPMsystem; WPM 3, WPM 3i and LWZ from the integration source. Coverage [100 %](docs/COVERAGE.md#stiebel_isg).
 - **Samsung** EHS (Mono, Split, TDM) on the NASA bus: preset [`samsung`](docs/presets/samsung.md), integration [esphome-samsung-nasa](https://github.com/Beormund/esphome-samsung-nasa) (ESPHome). Tested on a real installation. Coverage [100 %](docs/COVERAGE.md#samsung).
-- **Samsung** EHS on the NASA bus with an RS485 bridge: preset [`ehs_sentinel`](docs/presets/ehs-sentinel.md), integration [EHS Sentinel](https://github.com/echoDaveD/ehs_sentinel_hacs_integration) (HACS). Untested (built from the integration's NASA repository and the entity list of one installation). Coverage [0 %](docs/COVERAGE.md#ehs_sentinel).
+- **Samsung** EHS on the NASA bus with an RS485 bridge: preset [`ehs_sentinel`](docs/presets/ehs-sentinel.md), integration [EHS Sentinel](https://github.com/echoDaveD/ehs_sentinel_hacs_integration) (HACS). Untested (built from the integration's NASA repository and the entity list of one installation). Coverage [100 %](docs/COVERAGE.md#ehs_sentinel).
 - **Daikin** Altherma, **ROTEX** (Altherma 3, LT, EPRA, ERGA, EBLA …): preset [`espaltherma`](docs/presets/espaltherma.md), integration [ESPAltherma](https://github.com/raomin/ESPAltherma) (ESP32 on the X10A port, MQTT device discovery of the beta branch). Tested on a real installation (EPRA12EAV3, heating and hot water). Coverage [92 %](docs/COVERAGE.md#espaltherma), 1 open.
 - **Any other heat pump**: no preset; the editor's mapping assistant or your own `entities` ([any other heat pump](#any-other-heat-pump)).
 
@@ -514,10 +514,10 @@ The built-in languages and how complete they are (generated, see [coverage](docs
 | Language | Card texts | Editor |
 |---|---|---|
 | Deutsch (`de`) | 100 % | 100 % |
-| Polski (`pl`) | 100 % | 100 % |
-| Slovenčina (`sk`) | 100 % | 100 % |
-| Čeština (`cs`) | 100 % | 100 % |
-| Nederlands (`nl`) | 100 % | 100 % |
+| Polski (`pl`) | 100 % | 96 % (11 missing) |
+| Slovenčina (`sk`) | 100 % | 96 % (11 missing) |
+| Čeština (`cs`) | 100 % | 96 % (11 missing) |
+| Nederlands (`nl`) | 100 % | 96 % (11 missing) |
 <!-- /coverage:languages -->
 
 Would you like your language built in for everybody, including the editor? Translations are welcome and can be partial: [docs/TRANSLATING.md](docs/TRANSLATING.md).

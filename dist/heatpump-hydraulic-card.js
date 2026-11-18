@@ -1993,6 +1993,15 @@ const HFC_EDITOR = {
     assistant_intro: 'Exact English and German names, units and device classes are checked. Select every proposal you want to save.',
     assistant_apply: 'Use selected proposals',
     assistant_none: 'No unambiguous proposals were found on this device.',
+    confirm_title: 'Check your installation',
+    confirm_intro: 'The integration does not tell this, and the answer changes the drawing. The preview shows your choice at once; nothing is saved until you press Save.',
+    confirm_buffer: 'Is there a buffer tank between the heat pump and the heating circuits?',
+    confirm_buffer_help: 'A buffer separates the heat pump circuit from the heating circuits. A hot-water tank does not count.',
+    confirm_primary_pump: 'Does the pump the integration reports also run while hot water is charging?',
+    confirm_primary_pump_help: 'Yes: it is the heat pump’s own pump in front of the diverter valve. No: it is the pump of the heating circuit.',
+    confirm_circuits: 'The integration reports heating circuits {from} to {to}, but no circuit {missing}. Show these circuits?',
+    confirm_circuits_help: 'Yes: the card starts at circuit {from}. No: it keeps circuit {missing} first.',
+    confirm_yes: 'Yes', confirm_no: 'No', confirm_unknown: 'I don’t know',
     preset_help: 'Found entities are filled in below. Pick another entity to override one, clear a field to hide it.',
     from_energy: 'Empty: taken from the Energy dashboard',
     errors: 'Error entities', error_ok_text: 'Text states that mean no error',
@@ -2086,6 +2095,15 @@ const HFC_EDITOR = {
     assistant_intro: 'Exakte englische und deutsche Namen, Einheiten und Geräteklassen werden geprüft. Jeden gewünschten Vorschlag auswählen.',
     assistant_apply: 'Ausgewählte Vorschläge übernehmen',
     assistant_none: 'Auf diesem Gerät wurden keine eindeutigen Vorschläge gefunden.',
+    confirm_title: 'Anlage prüfen',
+    confirm_intro: 'Die Integration meldet das nicht, und die Antwort ändert die Zeichnung. Die Vorschau zeigt deine Wahl sofort; gespeichert wird erst mit Speichern.',
+    confirm_buffer: 'Gibt es einen Pufferspeicher zwischen Wärmepumpe und Heizkreisen?',
+    confirm_buffer_help: 'Ein Puffer trennt den Wärmepumpenkreis von den Heizkreisen. Ein Warmwasserspeicher zählt nicht.',
+    confirm_primary_pump: 'Läuft die Pumpe, die die Integration meldet, auch beim Warmwasserladen?',
+    confirm_primary_pump_help: 'Ja: Es ist die Pumpe der Wärmepumpe vor dem Umschaltventil. Nein: Es ist die Pumpe des Heizkreises.',
+    confirm_circuits: 'Die Integration meldet die Heizkreise {from} bis {to}, aber keinen Kreis {missing}. Diese Kreise zeigen?',
+    confirm_circuits_help: 'Ja: Die Karte beginnt bei Kreis {from}. Nein: Kreis {missing} bleibt der erste.',
+    confirm_yes: 'Ja', confirm_no: 'Nein', confirm_unknown: 'Weiß ich nicht',
     preset_help: 'Gefundene Entitäten sind unten eingetragen. Andere Entität wählen zum Überschreiben, Feld leeren zum Ausblenden.',
     from_energy: 'Leer: aus dem Energie-Dashboard',
     errors: 'Fehler-Entitäten', error_ok_text: 'Textzustände ohne Fehler',
@@ -3613,6 +3631,50 @@ class HeatpumpFlowCard extends HTMLElement {
       expected: L[`kind_${f.kind}`] || f.kind,
     }[k] ?? ''));
     return fill(L[`check_${f.code}`] || f.code);
+  }
+
+  // Questions about the installation that the integration cannot answer and whose answer changes the drawing (#299), from the most
+  // common case to the rarer one: [{ id, key, answered }]. An answer sets the option `key` to true or false. A question is listed
+  // while it applies, also once answered, so the editor can keep showing the choice made in this session.
+  //  1. buffer: no buffer sensor, no answer from the heat generator (preset defaults), no combined storage or series buffer;
+  //  2. primary_pump: with no buffer (answered or reported) and one circuit, a preset with `shared_pump` reports one pump that can
+  //     be the heat pump's own pump in front of the diverter valve (#344) or the circuit's pump.
+  static _layoutQuestions(config, hass, r) {
+    if (!config || !hass?.states || !r || (r.preset && !r.ready)) return [];
+    const has = (k) => { const id = r.entities[k]; return !!(id && hass.states[id]); };
+    // Nothing to ask before the heat pump itself is mapped.
+    if (!['flow', 'mode', 'compressor', 'power'].some(has)) return [];
+    let found = {};
+    try { found = typeof r.preset?.defaults === 'function' ? r.preset.defaults(r.entities, hass) || {} : {}; } catch (err) { found = {}; }
+    const out = [];
+    const storageFixed = config.storage === 'combined' || !!config.series_buffer;
+    const bufferSensors = ['buffer_top', 'buffer_middle', 'buffer_bottom', 'buffer_mode'].some(has);
+    const bufferKnown = storageFixed || bufferSensors || typeof found.buffer === 'boolean';
+    if (!bufferKnown) out.push({ id: 'buffer', key: 'buffer', answered: typeof config.buffer === 'boolean' });
+    const noBuffer = !storageFixed && !bufferSensors && (config.buffer === false || (config.buffer === undefined && found.buffer === false));
+    const ownPump = config.entities?.hc_pump;
+    if (noBuffer && r.preset?.shared_pump && hfcHcCount(config) === 1 && has('hc_pump') && (ownPump === undefined || ownPump === null)
+      && typeof found.primary_pump !== 'boolean' && !has('primary_pump_state')) {
+      out.push({ id: 'primary_pump', key: 'primary_pump', answered: typeof config.primary_pump === 'boolean' });
+    }
+    // 3. circuits: a preset that numbers its circuits (`index.hc`) finds none at 1 but further ones, such as the Open3E circuits 2
+    //    to 4 (#269). Without an answer the card draws an empty first circuit; "yes" starts at the first one found.
+    if (r.preset?.index?.hc !== undefined && r.preset.auto_circuits !== false) {
+      const live = (id) => [].concat(id || []).some((x) => hass.states[x] && !['unknown', 'unavailable'].includes(hass.states[x].state));
+      // The same installation as the card (a selected or detected prefix), from the preset's own first circuit on.
+      const all = HeatpumpFlowCard._resolve({ preset: config.preset, device: config.device, prefix: r.prefix || config.prefix, hc_count: HFC_MAX_HC }, hass).fromPreset;
+      const found = (n) => ['flow', 'mode', 'pump'].some((k) => live(all[n === 1 ? `hc_${k}` : `hc${n}_${k}`]));
+      let pos = 0;
+      for (let n = 2; n <= HFC_MAX_HC && !pos; n++) if (found(n)) pos = n;
+      if (pos && !found(1)) {
+        let last = pos;
+        while (last < HFC_MAX_HC && found(last + 1)) last++;
+        // Positions on the card are counted from 1; the integration counts from the preset's index base (myPyllant from 0).
+        const base = +r.preset.index.hc;
+        out.push({ id: 'circuits', key: 'index', base, first: base + pos - 1, count: last - pos + 1, answered: config.index?.hc !== undefined });
+      }
+    }
+    return out;
   }
 
   // Entities the preset would map but that are disabled in Home Assistant (#146), from the full entity registry (`disabled`:
@@ -8199,6 +8261,64 @@ class HeatpumpFlowCardEditor extends HTMLElement {
     };
   }
 
+  // Questions about the installation (#299). An open question is shown above the form; once shown it stays for this editor session,
+  // with the choice marked, so it can be changed or taken back. An answer goes to the preview at once, through the existing option;
+  // Home Assistant saves it only with Save, and Cancel keeps the saved configuration. "I don't know" removes the option again.
+  _renderLayout(questions, L) {
+    if (!this._layout) return;
+    this._layoutShown = this._layoutShown || new Set();
+    questions.filter((q) => !q.answered).forEach((q) => this._layoutShown.add(q.id));
+    const list = questions.filter((q) => this._layoutShown.has(q.id));
+    const esc = (x) => String(x).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    const value = (q) => (q.id === 'circuits'
+      ? (this._config.index?.hc === q.first ? 'yes' : this._config.index?.hc === q.base ? 'no' : 'unknown')
+      : this._config[q.key] === true ? 'yes' : this._config[q.key] === false ? 'no' : 'unknown');
+    const text = (q, key) => String(L[`confirm_${q.id}${key}`] || '').replace(/\{from\}/g, q.first).replace(/\{to\}/g, q.first + q.count - 1)
+      .replace(/\{missing\}/g, q.base);
+    const html = list.length ? `<ha-alert alert-type="info" title="${esc(L.confirm_title)}">${esc(L.confirm_intro)}</ha-alert>${list.map((q) => `
+      <fieldset data-hfc-layout="${q.id}" style="border:0;margin:10px 2px 4px;padding:0">
+        <legend style="font-weight:500;padding:0;margin-bottom:6px">${esc(text(q, ''))}</legend>
+        <div style="font-size:0.9em;opacity:0.8;margin-bottom:6px">${esc(text(q, '_help'))}</div>
+        ${['yes', 'no', 'unknown'].map((choice) => `<label style="display:inline-flex;gap:6px;align-items:center;margin:0 16px 6px 0">
+          <input type="radio" name="hfc-layout-${q.id}" value="${choice}" data-hfc-layout-choice="${q.id}"${value(q) === choice ? ' checked' : ''}>${esc(L[`confirm_${choice}`])}</label>`).join('')}
+      </fieldset>`).join('')}` : '';
+    if (this._layout._html !== html) {
+      this._layout.innerHTML = html; this._layout._html = html; this._layout.style.marginBottom = html ? '12px' : '0';
+    }
+    this._layout.onchange = (ev) => {
+      const input = ev.target;
+      const q = list.find((x) => x.id === input?.dataset?.hfcLayoutChoice);
+      if (q && input.checked) this._answerLayout(q, input.value);
+    };
+  }
+
+  _answerLayout(q, choice) {
+    const config = { ...this._config };
+    if (q.id === 'circuits') {
+      // The circuit count as it was before the first answer, to restore it on "No" and "I don't know".
+      this._layoutCount = this._layoutCount || { hc_count: this._config.hc_count };
+      const index = { ...(config.index || {}) };
+      if (choice === 'unknown') delete index.hc; else index.hc = choice === 'yes' ? q.first : q.base;
+      if (Object.keys(index).length) config.index = index; else delete config.index;
+      const count = choice === 'yes' ? q.count : this._layoutCount.hc_count;
+      if (count === undefined || count === 1) delete config.hc_count; else config.hc_count = count;
+      this._config = config;
+      this.dispatchEvent(new CustomEvent('config-changed', { detail: { config }, bubbles: true, composed: true }));
+      this._render();
+      return;
+    }
+    if (choice === 'yes') config[q.key] = true;
+    else if (choice === 'no') config[q.key] = false;
+    else delete config[q.key];
+    // A parallel buffer and a series buffer exclude each other, as with the switches below.
+    if (q.key === 'buffer' && config.buffer === true) { delete config.series_buffer; delete config.series_bypass; }
+    // The pump question only applies without a buffer: a buffer after all takes back its answer from this session.
+    if (q.key === 'buffer' && config.buffer !== false && this._layoutShown?.has('primary_pump')) { delete config.primary_pump; this._layoutShown.delete('primary_pump'); }
+    this._config = config;
+    this.dispatchEvent(new CustomEvent('config-changed', { detail: { config }, bubbles: true, composed: true }));
+    this._render();
+  }
+
   _applyAssistant(proposals) {
     const entities = { ...(this._config.entities || {}) };
     proposals.forEach(({ key, id }) => { if (key && id) entities[key] = id; });
@@ -8214,8 +8334,10 @@ class HeatpumpFlowCardEditor extends HTMLElement {
       this._form = document.createElement('ha-form');
       this._form.addEventListener('value-changed', (ev) => { ev.stopPropagation(); this._changed(ev.detail.value); });
       this._assistant = document.createElement('div');
+      this._layout = document.createElement('div');
       this._warn = document.createElement('div');
       this.appendChild(this._assistant);
+      this.appendChild(this._layout);
       this.appendChild(this._warn);
       this.appendChild(this._form);
     }
@@ -8289,6 +8411,7 @@ class HeatpumpFlowCardEditor extends HTMLElement {
     if (this._warn._html !== html) { this._warn.innerHTML = html; this._warn._html = html; this._warn.style.marginBottom = html ? '12px' : '0'; }
     const proposals = assistant ? HeatpumpFlowCard._assistantProposals(this._hass, this._assistantDevice, this._config) : [];
     this._renderAssistant(assistant, proposals, L, computeLabel);
+    this._renderLayout(HeatpumpFlowCard._layoutQuestions(this._config, this._hass, r), L);
     this._form.hass = this._hass;
     this._form.schema = schema;
     this._form.computeLabel = computeLabel;
@@ -8414,8 +8537,10 @@ class HeatpumpFlowCardEditor extends HTMLElement {
     const seriesChanged = !!value.series_buffer !== !!this._config.series_buffer;
     if (value.buffer && bufferChanged) { delete config.series_buffer; delete config.series_bypass; }
     else if (value.series_buffer && seriesChanged) delete config.buffer;
-    // A preset that reads the buffer from the installation (defaults) keeps an explicit false; otherwise off is the default.
-    if (!value.buffer && !(value.buffer === false && typeof HFC_PRESETS[config.preset]?.defaults === 'function')) delete config.buffer;
+    // A preset that reads the buffer from the installation (defaults) keeps an explicit false, and so does an answered "no buffer"
+    // (#299) while the switch stays off; otherwise off is the default.
+    const keepFalse = typeof HFC_PRESETS[config.preset]?.defaults === 'function' || this._config.buffer === false;
+    if (!value.buffer && !(value.buffer === false && keepFalse)) delete config.buffer;
     // series_bypass only matters as false next to a series buffer; the switch's default (true) is not written.
     if (!config.series_buffer || value.series_bypass !== false) delete config.series_bypass;
     if (!value.dhw_type || value.dhw_type === 'coil' || (value.dhw_type === 'tank_in_tank' && config.storage !== 'combined')) delete config.dhw_type;

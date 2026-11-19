@@ -780,8 +780,14 @@
     check(fmt(tail) === 'dhw:10-40.5:s1', `#173: a heating piece of 30 s after a charge is part of the charge (${fmt(tail)})`);
     const head = piece([[0, 'idle'], [10 * M, 'heating'], [10 * M + 4 * S, 'dhw'], [40 * M, 'idle']], [[0, '0'], [10 * M, '40'], [40 * M, '0']], 0, 60 * M);
     check(fmt(head) === 'dhw:10-40:s1', `#173: a heating piece of 4 s before a charge is part of the charge (${fmt(head)})`);
+    // #173 beta feedback: the run panel lists the time per kind from the phases, so the folded piece is hot water there, too.
+    const kinds = (runs) => runs.map((r) => [...new Set(r.phases.map((p) => p.kind))].join('+')).join(' ');
+    check(kinds(tail) === 'dhw' && kinds(head) === 'dhw', `#173: the phases of a charge with a folded heating piece are hot water only (${kinds(tail)} / ${kinds(head)})`);
+    const thawTail = piece([[0, 'idle'], [10 * M, 'dhw'], [20 * M, 'defrost'], [22 * M, 'dhw'], [40 * M, 'heating'], [40 * M + 30 * S, 'idle']], [[0, '0'], [10 * M, '40'], [40 * M + 30 * S, '0']], 0, 60 * M);
+    check(kinds(thawTail) === 'dhw+defrost', `#173: a defrost inside the charge keeps its kind when the tail folds (${kinds(thawTail)})`);
     const inner = piece([[0, 'heating'], [20 * M, 'dhw'], [20 * M + 20 * S, 'heating'], [50 * M, 'idle']], [[0, '40'], [50 * M, '0']], 0, 60 * M);
     check(fmt(inner) === 'heat:0-50:s1:partial', `#173: a hot-water piece of 20 s inside heating does not divide it (${fmt(inner)})`);
+    check(kinds(inner) === 'heat', `#173: the folded hot-water piece is heating in the phases (${kinds(inner)})`);
     const keep = piece([[0, 'idle'], [10 * M, 'dhw'], [40 * M, 'heating'], [41 * M, 'idle']], [[0, '0'], [10 * M, '40'], [41 * M, '0']], 0, 60 * M);
     check(fmt(keep) === 'dhw:10-40:s1 heat:40-41:s1', `#173: a heating period of a minute stays its own (${fmt(keep)})`);
     const now = piece([[0, 'idle'], [10 * M, 'dhw'], [40 * M, 'heating']], [[0, '0'], [10 * M, '40']], 0, 40 * M + 30 * S);

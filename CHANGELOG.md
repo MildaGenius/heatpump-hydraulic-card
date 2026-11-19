@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.20.0-beta.2 – 2026-11-19
+- NIBE preset: the priority TRANSFER, which follows a hot-water charge on the F370/F470, counts as hot water instead of an unknown mode (#253).
+- Aira preset: the hot-water target comes from the water heater entity, which follows the schedule of the Aira app; the target sensor only holds the default temperature and is now the fallback (#417).
+- Run panel: a period under a minute that folds into its neighbour (0.20.0-beta.1) no longer appears in the time per kind, so a hot-water charge with its short heating tail reads "Hot water 33 min", not "Hot water 33 min · Heating < 1 min". A defrost inside the run keeps its own line (#173).
+
 ## 0.20.0-beta.1 – 2026-11-18
 - New preset `airahome` for Aira heat pumps with the integration ha-airahome: active state as the mode (anti-legionella as hot water), compressor speed, defrost, power and heat, the outdoor unit's circulator as the primary pump, the buffer from the indoor unit supply temperature, tank, zones with supply, circulator and thermostat, away mode and alarms. Found by translation key, so the `ah_<id>_` ids do not matter (#417).
 - Drawing: labels that compete for room move to a free place instead of overlapping (#395, layout step). On narrow cards and with long texts the circuit title moves right next to a heating-curve target that reached it (and is shortened there if needed), and below 400 px the flow temperature under the pump moves clear of the mixer bypass. Normal cards look the same.

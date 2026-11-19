@@ -1,10 +1,10 @@
 # Issue plan
 
-**GitHub assignments · state on 18 November 2026, with 0.20.0-beta.1.** The milestone table records the assigned issues, including the three lead issues. The recommendations below give the scope and evidence for each item. A field report can belong to a milestone without committing an entire preset or layout to that release. [Roadmap and milestone criteria](ROADMAP.md) · [Open issues](https://github.com/Sturmi77/heatpump-hydraulic-card/issues?q=is%3Aissue+is%3Aopen)
+**GitHub assignments · state on 19 November 2026, with 0.20.0-beta.2.** The milestone table records the assigned issues, including the three lead issues. The recommendations below give the scope and evidence for each item. A field report can belong to a milestone without committing an entire preset or layout to that release. [Roadmap and milestone criteria](ROADMAP.md) · [Open issues](https://github.com/Sturmi77/heatpump-hydraulic-card/issues?q=is%3Aissue+is%3Aopen)
 
 ## Pull requests
 
-No open pull requests. Everything on `main` up to 18 November is in `0.20.0-beta.1`: #418, #419, #426, #440–#448, #450, #451.
+Open: #452 (Bosch/Buderus heat source type and brine values, waiting for its author). Everything on `main` up to 19 November is in `0.20.0-beta.2`: #418, #419, #426, #440–#448, #450, #451 in beta.1; #454–#457 in beta.2.
 
 ## GitHub milestones
 
@@ -13,7 +13,7 @@ No open pull requests. Everything on `main` up to 18 November is in `0.20.0-beta
 | [0.18.0](https://github.com/Sturmi77/heatpump-hydraulic-card/milestone/11) | closed | Released on 4 November. |
 | [Field baseline (0.18.x)](https://github.com/Sturmi77/heatpump-hydraulic-card/milestone/13) | #298 (lead), #254 (#282 done); recruitment in the [call for testers](https://github.com/Sturmi77/heatpump-hydraulic-card/discussions/453) | Supported-preset cohort and field confirmations. Daikin is a separate exploratory pilot outside the cohort. |
 | [0.19.0](https://github.com/Sturmi77/heatpump-hydraulic-card/milestone/14) | closed with the release: #300 (lead), #23, #4, #344, #349, #359, #195 (done before: #289, #290, #323–#327, #333, #338, #346, #357, #360, #361, #365, #367) | Released on 14 November: cycle details, circuit spread, complete heat/power pairs on a real cascade, display units and the phone readability trial. |
-| [0.20.0](https://github.com/Sturmi77/heatpump-hydraulic-card/milestone/12) | #299 (lead), #253, #403, #407, #413 (points 1–3; 4 by its reporter), #415, #416, #417 (#269 done) | Installation confirmation (#299), new presets NIBE, EHS Sentinel and Aira, counts from the history; pre-release beta.1 on 18 November. |
+| [0.20.0](https://github.com/Sturmi77/heatpump-hydraulic-card/milestone/12) | #299 (lead), #253, #403, #407, #413 (points 1–3; 4 by its reporter), #415, #416, #417 (#269 done) | Installation confirmation (#299), new presets NIBE, EHS Sentinel and Aira, counts from the history; pre-release beta.1 on 18 November, beta.2 on 19 November. |
 | [0.21.0](https://github.com/Sturmi77/heatpump-hydraulic-card/milestone/16) | #173 (second unit `target: buffer`, numbers only if winter data show overlaps), #395 (rest of stage 3) | Drawing work that needs the layout step, presets with new field data. |
 | [Later](https://github.com/Sturmi77/heatpump-hydraulic-card/milestone/15) | #12, #27, #31, #36, #82, #101, #114, #224, #248, #250, #252, #255, #256, #260, #261, #267, #276, #309, #315–#318, #322, #331, #366 | Open follow-ups with no release commitment. For analytics, take #27 before #114. |
 
@@ -29,7 +29,9 @@ No open pull requests. Everything on `main` up to 18 November is in `0.20.0-beta
 
 Pre-release beta.1 on 18 November, after five sprints of one to two days on 17 and 18 November. Lead [#299](https://github.com/Sturmi77/heatpump-hydraulic-card/issues/299): the editor asks where the integration cannot tell how the installation is built ([#447](https://github.com/Sturmi77/heatpump-hydraulic-card/pull/447)). Also in beta.1: the presets NIBE F series ([#441](https://github.com/Sturmi77/heatpump-hydraulic-card/pull/441), #253), Samsung EHS Sentinel ([#442](https://github.com/Sturmi77/heatpump-hydraulic-card/pull/442), #403) and Aira ([#443](https://github.com/Sturmi77/heatpump-hydraulic-card/pull/443), #417); counts from the history ([#446](https://github.com/Sturmi77/heatpump-hydraulic-card/pull/446), #407); default tiles, standstill superheat and short entity names ([#445](https://github.com/Sturmi77/heatpump-hydraulic-card/pull/445), #413 points 1–3); run periods under a minute ([#444](https://github.com/Sturmi77/heatpump-hydraulic-card/pull/444), #173); the first part of the layout step ([#450](https://github.com/Sturmi77/heatpump-hydraulic-card/pull/450), #395); and #418, #419, #426, #440 from before.
 
-For the final release: the reporters of #253, #403, #417, #407 and #413 confirm on their installations; point 4 of #413 comes from its reporter. Moved to 0.21.0: the second unit's own target (#173; numbers only if winter data show overlaps, drawing once more cascades report) and the rest of stage 3 of #395.
+Beta.2 on 19 November with the first reports: NIBE TRANSFER counts as hot water and the Aira hot-water target follows the schedule ([#457](https://github.com/Sturmi77/heatpump-hydraulic-card/pull/457)), and folded run periods count as their neighbour in the run panel ([#455](https://github.com/Sturmi77/heatpump-hydraulic-card/pull/455)). Confirmed on beta.1: EHS Sentinel (#403) and the counts from the history (#407).
+
+For the final release: the reporters of #253, #417 and #413 confirm on their installations; point 4 of #413 comes from its reporter. Moved to 0.21.0: the second unit's own target (#173; numbers only if winter data show overlaps, drawing once more cascades report) and the rest of stage 3 of #395.
 
 ## 0.19.0 · Understand a cycle
 

@@ -1507,6 +1507,8 @@
     add('binary_sensor.ah_3e2_inline_heater', 'inline_heater', 'off');
     add('sensor.ah_3e2_dhw_temperature', 'hot_water_temp', '55.5', '°C');
     add('water_heater.ah_3e2_dhw_tank', 'water_heater', 'off', null, { temperature: 50, current_temperature: 55.5 });
+    // The app's default temperature; the scheduled target (50 here) lives only in the water heater (#417).
+    add('sensor.ah_3e2_target_dhw_temperature', 'target_hot_water_temp', '55', '°C');
     add('sensor.ah_3e2_indoor_unit_supply_temperature', 'indoor_supply_temp', '30.6', '°C');
     add('sensor.ah_3e2_zone_1_supply_temperature', 'zone_1_supply_temp', '29.9', '°C');
     add('sensor.ah_3e2_zone_1_calculated_supply_temperature', 'zone_1_calculated_supply_temp', '28.1', '°C');
@@ -1533,7 +1535,7 @@
     check(e.buffer_top === 'sensor.ah_3e2_indoor_unit_supply_temperature' && e.dhw_top === 'sensor.ah_3e2_dhw_temperature' && e.dhw_target === 'water_heater.ah_3e2_dhw_tank'
       && e.hc_flow === 'sensor.ah_3e2_zone_1_supply_temperature' && e.hc_pump === 'binary_sensor.ah_3e2_zone_1_circulator' && e.room_target === 'climate.ah_3e2_zone_1'
       && e.program === 'binary_sensor.ah_3e2_away_mode',
-    `Aira: buffer from the indoor unit supply, tank and its target, zone 1 supply, circulator and thermostat, away mode (${e.buffer_top} / ${e.dhw_target})`);
+    `Aira: buffer from the indoor unit supply, tank and its scheduled target before the default sensor, zone 1 supply, circulator and thermostat, away mode (${e.buffer_top} / ${e.dhw_target})`);
     const findings = C._checks({ preset: 'airahome' }, hass, r).map((f) => `${f.key}:${f.code}`);
     check(!findings.length, `Aira: the mapping passes the plausibility checks (${findings.join(', ')})`);
     const card = mount({ preset: 'airahome' }, hass); await wait(20);
@@ -1654,6 +1656,8 @@
     const dhw = card._flowModel();
     const errOn = card.shadowRoot.getElementById('chip-err').classList.contains('on');
     check(dhw.hp === 'dhw' && errOn, `NIBE: prio HOT WATER means hot water, alarm 162 is an error (${dhw.hp} / ${errOn})`);
+    card.hass = hassOf({ ...states, ...toStates({ 'sensor.prio_43086': 'TRANSFER' }) }, registry); await wait(5);
+    check(card._flowModel().hp === 'dhw', `NIBE: prio TRANSFER after a charge counts as hot water (${card._flowModel().hp})`);
     card.hass = hassOf({ ...states, ...toStates({ 'sensor.prio_43086': 'OFF', 'sensor.compressor_state_ep14_43427': 'STOPPED', 'sensor.alarm_45001': '0' }) }, registry); await wait(5);
     const idle = card._flowModel();
     check(!idle.running && idle.hp === 'idle', `NIBE: prio OFF and STOPPED is idle (${idle.hp})`);

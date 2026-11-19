@@ -1034,7 +1034,8 @@ const HFC_PRESETS = {
         fan_speed: s('ou_fan_1_speed'),
         heater: b('inline_heater'),
         dhw_top: s('hot_water_temp'),
-        dhw_target: [s('target_hot_water_temp'), ctx.key('airahome', 'water_heater', 'water_heater')].filter(Boolean),
+        // The water heater's target follows the schedule of the Aira app; the sensor only holds the default temperature (#417).
+        dhw_target: [ctx.key('airahome', 'water_heater', 'water_heater'), s('target_hot_water_temp')].filter(Boolean),
         buffer_top: s('indoor_supply_temp'),
         hc_flow: s(`zone_${n}_supply_temp`),
         hc_setpoint: s(`zone_${n}_calculated_supply_temp`),
@@ -1706,8 +1707,9 @@ const HFC_PRESETS = {
     errors: (p, i, ctx) => [ctx.match(/^sensor\.alarm_45001(?:_\d+)?$/, 'nibe_heatpump')].filter(Boolean),
     // Alarm 0 is none; 183 is "defrosting in progress", an information, not a fault (#253).
     error_ok: ['183'],
-    // Prio (coil 43086). TRANSFER stays unmapped until it is known what the unit does then (#253).
-    mode_map: { OFF: 'idle', HEAT: 'heating', 'HOT WATER': 'dhw', POOL: 'heating', 'POOL 2': 'heating', COOLING: 'cooling' },
+    // Prio (coil 43086). TRANSFER follows a hot water charge on the F370/F470 and keeps the compressor on the hot water stop
+    // temperature; the heating supply does not rise then, so it counts as hot water (#253).
+    mode_map: { OFF: 'idle', HEAT: 'heating', 'HOT WATER': 'dhw', TRANSFER: 'dhw', POOL: 'heating', 'POOL 2': 'heating', COOLING: 'cooling' },
     program_map: { ACTIVE: 'holiday', INACTIVE: 'none' },
   },
 };

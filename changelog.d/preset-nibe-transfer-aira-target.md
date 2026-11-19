@@ -1,2 +1,0 @@
-- NIBE preset: the priority TRANSFER, which follows a hot-water charge on the F370/F470, counts as hot water instead of an unknown mode (#253).
-- Aira preset: the hot-water target comes from the water heater entity, which follows the schedule of the Aira app; the target sensor only holds the default temperature and is now the fallback (#417).

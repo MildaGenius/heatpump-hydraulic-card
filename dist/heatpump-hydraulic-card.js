@@ -6459,11 +6459,14 @@ class HeatpumpFlowCard extends HTMLElement {
         for (let k = parts.length - 1; k > 0; k--) if (parts[k].kind === parts[k - 1].kind) parts.splice(k, 1);
         n = 0;
       }
+      // A folded piece belongs to the period it folds into, in the phases as well: the run panel lists the time per kind from them,
+      // which showed "Hot water 33 min · Heating < 1 min" for a charge with its 29 s tail (#173). Defrost and SG-Ready keep their kind.
+      const own = (phases, kind) => (split ? phases.map((p) => (['defrost', 'sg-boost', 'sg-forced'].includes(p.kind) || (p.kind === 'pv' ? 'heat' : p.kind) === kind ? p : { ...p, kind })) : phases);
       // A run folded into one period takes that period's kind, so its head and values follow what is left (Codex review of #444).
-      if (parts.length < 2) return [split && parts[0] ? { ...r, kind: parts[0].kind } : r];
+      if (parts.length < 2) return [split && parts[0] ? { ...r, kind: parts[0].kind, phases: own(r.phases, parts[0].kind) } : r];
       return parts.map((part, n) => {
         const from = n ? part.from : r.from; const to = parts[n + 1]?.from ?? r.to;
-        return { ...r, from, to, kind: part.kind, phases: phasesIn(from, to), partial: r.partial && !n, ongoing: r.ongoing && n === parts.length - 1, pause: n ? null : r.pause };
+        return { ...r, from, to, kind: part.kind, phases: own(phasesIn(from, to), part.kind), partial: r.partial && !n, ongoing: r.ongoing && n === parts.length - 1, pause: n ? null : r.pause };
       });
     });
   }

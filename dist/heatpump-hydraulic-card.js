@@ -1712,6 +1712,46 @@ const HFC_PRESETS = {
     mode_map: { OFF: 'idle', HEAT: 'heating', 'HOT WATER': 'dhw', TRANSFER: 'dhw', POOL: 'heating', 'POOL 2': 'heating', COOLING: 'cooling' },
     program_map: { ACTIVE: 'holiday', INACTIVE: 'none' },
   },
+
+  // Daikin Altherma through the Daikin Onecta cloud integration. Its translation keys are stable across
+  // entity-id changes and Home Assistant languages; the HVAC mode is a selected mode, not a compressor signal.
+  daikin_onecta: {
+    name: 'Daikin Onecta',
+    entity_registry: true,
+    run_signal: 'power',
+    valve_rule: 'flow_above_dhw',
+    detect: (ctx) => (ctx.key('daikin_onecta', 'sensor', 'leavingwatertemperature') ? '' : undefined),
+    entities: (p, i, ctx) => {
+      const s = (...keys) => keys.map((key) => ctx.key('daikin_onecta', 'sensor', key)).filter(Boolean);
+      return {
+        mode: ctx.key('daikin_onecta', 'climate', 'leavingwatertemperature'),
+        power: s('currentpowerconsumption'),
+        heat: s('currentthermaloutput'),
+        flow: s('leavingwatertemperature'),
+        hc_flow: s('leavingwatertemperature'),
+        room: s('roomtemperature'),
+        dhw_top: s('tanktemperature'),
+        outdoor: s('outdoortemperature'),
+        energy_today: s('heatingdailyelectricalconsumption'),
+      };
+    },
+    errors: (p, i, ctx) => ['isinerrorstate', 'isinwarningstate', 'isincautionstate']
+      .map((key) => ctx.key('daikin_onecta', 'binary_sensor', key)).filter(Boolean),
+    default_tiles: ['energy_heating:today', 'energy_cooling:today'],
+    tiles: (p, i, ctx) => {
+      const s = (key) => ctx.key('daikin_onecta', 'sensor', key);
+      const periods = (group, types) => Object.fromEntries(types.map(([period, suffix]) => [period, s(`${group}${suffix}`)]).filter(([, id]) => id));
+      return {
+        energy_heating: periods('heating', [['today', 'dailyelectricalconsumption'], ['week', 'weeklyelectricalconsumption'],
+          ['month', 'monthlyelectricalconsumption'], ['year', 'yearlyelectricalconsumption']]),
+        energy_cooling: periods('cooling', [['today', 'dailyelectricalconsumption'], ['week', 'weeklyelectricalconsumption'],
+          ['month', 'monthlyelectricalconsumption'], ['year', 'yearlyelectricalconsumption']]),
+        heat_heating: periods('heating', [['month', 'monthlythermaloutput'], ['year', 'yearlythermaloutput']]),
+        heat_cooling: periods('cooling', [['month', 'monthlythermaloutput'], ['year', 'yearlythermaloutput']]),
+      };
+    },
+    mode_map: { off: 'off', heat: 'heating', cool: 'cooling', heat_cool: 'heating' },
+  },
 };
 
 /* ------------------------------------------------------------------ */
@@ -3900,8 +3940,9 @@ class HeatpumpFlowCard extends HTMLElement {
       // Where runs and the running state come from (#365).
       `Runs from: ${(() => {
         const threshold = Number.isFinite(+config.power_threshold) && config.power_threshold !== '' && config.power_threshold !== undefined && config.power_threshold !== null ? +config.power_threshold : (r.preset?.power_threshold ?? 100);
-        if (config.run_signal === 'units') return Array.isArray(config.units) && config.units.length ? `unit power above ${[...new Set(config.units.map((u) => `${hfcUnitRunW(u)} W`))].join(' / ')} (run_signal: units)` : 'compressor or operating mode (run_signal: units, but no units are configured)';
-        if (config.run_signal === 'power') return r.entities.power ? `power above ${threshold} W (run_signal: power)` : 'compressor or operating mode (run_signal: power, but power is not mapped)';
+        const signal = config.run_signal ?? r.preset?.run_signal;
+        if (signal === 'units') return Array.isArray(config.units) && config.units.length ? `unit power above ${[...new Set(config.units.map((u) => `${hfcUnitRunW(u)} W`))].join(' / ')} (run_signal: units)` : 'compressor or operating mode (run_signal: units, but no units are configured)';
+        if (signal === 'power') return r.entities.power ? `power above ${threshold} W (run_signal: power)` : 'compressor or operating mode (run_signal: power, but power is not mapped)';
         return 'compressor or operating mode';
       })()}`,
       `Flow rates shown in: ${String(config.flow_rate_unit || 'l/h').replace('m3/h', 'm³/h')}`,
@@ -6332,7 +6373,7 @@ class HeatpumpFlowCard extends HTMLElement {
 
   // `run_signal` (#365): 'units' or 'power' when its source is configured, else null (the compressor and the mode decide).
   _runSignal() {
-    const v = this._config?.run_signal;
+    const v = this._config?.run_signal ?? this._preset?.run_signal;
     if (v === 'units') return Array.isArray(this._config.units) && this._config.units.length ? 'units' : null;
     if (v === 'power') return this._has('power') ? 'power' : null;
     return null;
@@ -7332,7 +7373,7 @@ class HeatpumpFlowCard extends HTMLElement {
     // run_signal (#365): the mode decides only cooling and a lock; the valve decides hot water while the heat pump runs.
     if (signal) {
       hp = hp === 'blocked' ? 'blocked' : defrost && running ? 'defrost' : !running ? (hp === 'off' ? 'off' : 'idle')
-        : hp === 'cooling' ? 'cooling' : this._has('valve') ? (valveDhw ? 'dhw' : 'heating') : (['heating', 'dhw', 'cooling'].includes(hp) ? hp : 'heating');
+        : hp === 'cooling' ? 'cooling' : this._has('valve') || valveDhw ? (valveDhw ? 'dhw' : 'heating') : (['heating', 'dhw', 'cooling'].includes(hp) ? hp : 'heating');
     } else if (!this._has('mode')) hp = defrost ? 'defrost' : !running ? 'idle' : (valveDhw ? 'dhw' : 'heating');
     // A defrost entity wins over an operating mode that keeps reporting heating while the unit defrosts (e.g. Kronoterm).
     else if (this._has('defrost') && this._on('defrost') && ['heating', 'cooling', 'dhw'].includes(hp)) hp = 'defrost';

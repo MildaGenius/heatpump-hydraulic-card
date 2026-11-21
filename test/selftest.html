@@ -1487,6 +1487,68 @@
     check(!detects('espaltherma', { 'sensor.althermasensors': 'Online' }, { 'sensor.althermasensors': { platform: 'mqtt' } }), 'ESPAltherma: the attribute sensor alone is not detected');
   }
   {
+    // Daikin Onecta: stable translation keys, live power as the run signal, and only source-backed measurements.
+    const entries = {
+      'sensor.daikin_flow': ['sensor', 'leavingwatertemperature'],
+      'sensor.daikin_tank': ['sensor', 'tanktemperature'],
+      'sensor.daikin_outdoor': ['sensor', 'outdoortemperature'],
+      'sensor.daikin_power': ['sensor', 'currentpowerconsumption'],
+      'sensor.daikin_heat': ['sensor', 'currentthermaloutput'],
+      'sensor.daikin_room': ['sensor', 'roomtemperature'],
+      'climate.daikin_mode': ['climate', 'leavingwatertemperature'],
+      'binary_sensor.daikin_error': ['binary_sensor', 'isinerrorstate'],
+      'binary_sensor.daikin_warning': ['binary_sensor', 'isinwarningstate'],
+      'sensor.daikin_energy_heating_day': ['sensor', 'heatingdailyelectricalconsumption'],
+      'sensor.daikin_energy_heating_week': ['sensor', 'heatingweeklyelectricalconsumption'],
+      'sensor.daikin_energy_heating_month': ['sensor', 'heatingmonthlyelectricalconsumption'],
+      'sensor.daikin_energy_heating_year': ['sensor', 'heatingyearlyelectricalconsumption'],
+      'sensor.daikin_heat_heating_month': ['sensor', 'heatingmonthlythermaloutput'],
+      'sensor.daikin_heat_heating_year': ['sensor', 'heatingyearlythermaloutput'],
+    };
+    const states = toStates({
+      'sensor.daikin_flow': ['35', '°C'], 'sensor.daikin_tank': ['47', '°C'], 'sensor.daikin_outdoor': ['4', '°C'],
+      'sensor.daikin_power': ['1800', 'W'], 'sensor.daikin_heat': ['6200', 'W'], 'sensor.daikin_room': ['21.5', '°C'], 'climate.daikin_mode': 'heat',
+      'binary_sensor.daikin_error': 'off', 'binary_sensor.daikin_warning': 'off',
+      'sensor.daikin_energy_heating_day': ['12', 'kWh'], 'sensor.daikin_energy_heating_week': ['60', 'kWh'],
+      'sensor.daikin_energy_heating_month': ['180', 'kWh'], 'sensor.daikin_energy_heating_year': ['1200', 'kWh'],
+      'sensor.daikin_heat_heating_month': ['700', 'kWh'], 'sensor.daikin_heat_heating_year': ['4200', 'kWh'],
+    });
+    const registry = Object.fromEntries(Object.entries(entries).map(([id, [domain, translation_key]]) =>
+      [id, { platform: 'daikin_onecta', translation_key, device_id: 'daikin-device' }]));
+    const hass = hassOf(states, registry);
+    check(C.getStubConfig(hass).preset === 'daikin_onecta', `Daikin Onecta is detected by its water temperature (${JSON.stringify(C.getStubConfig(hass))})`);
+    const r = C._resolve({ preset: 'daikin_onecta' }, hass); const e = r.entities;
+    check(r.ready && e.mode === 'climate.daikin_mode' && e.flow === 'sensor.daikin_flow' && e.dhw_top === 'sensor.daikin_tank'
+      && e.outdoor === 'sensor.daikin_outdoor' && e.power === 'sensor.daikin_power' && e.heat === 'sensor.daikin_heat'
+      && e.room === 'sensor.daikin_room' && e.hc_flow === 'sensor.daikin_flow'
+      && e.energy_today === 'sensor.daikin_energy_heating_day'
+      && !e.return && !e.hc_return && !e.buffer_top && !e.compressor && !e.valve && !e.defrost,
+    `Daikin Onecta maps source-backed mode, flow, room, daily consumption and heat, without inventing return or buffer readings (${e.flow} / ${e.power})`);
+    check(r.tiles.energy_heating.today === 'sensor.daikin_energy_heating_day'
+      && r.tiles.energy_heating.week === 'sensor.daikin_energy_heating_week'
+      && r.tiles.heat_heating.month === 'sensor.daikin_heat_heating_month'
+      && r.tiles.heat_heating.year === 'sensor.daikin_heat_heating_year',
+    'Daikin Onecta maps per-mode electrical and thermal counters for the periods exposed by the integration');
+    check(!C._checks({ preset: 'daikin_onecta' }, hass, r).length, 'Daikin Onecta mappings pass field plausibility checks');
+
+    const card = mount({ preset: 'daikin_onecta' }, hass); await wait(20);
+    check(card._flowModel().running && card._flowModel().hp === 'heating',
+      'Daikin Onecta uses electrical power rather than the selected climate mode to determine whether it is running');
+    card.hass = hassOf({ ...states, ...toStates({ 'sensor.daikin_power': ['0', 'W'] }) }, registry); await wait(5);
+    check(!card._flowModel().running && card._flowModel().hp === 'idle',
+      'Daikin Onecta selected heating mode does not imply active operation when power is idle');
+    card.hass = hassOf({ ...states, ...toStates({ 'sensor.daikin_power': ['1800', 'W'], 'climate.daikin_mode': 'cool' }) }, registry); await wait(5);
+    check(card._flowModel().running && card._flowModel().hp === 'cooling', 'Daikin Onecta cooling mode is recognized while the unit draws power');
+    card.hass = hassOf({ ...states, ...toStates({ 'sensor.daikin_power': ['1800', 'W'], 'sensor.daikin_flow': ['52', '°C'] }) }, registry); await wait(5);
+    check(card._flowModel().hp === 'dhw', 'Daikin Onecta can infer a hot-water charge from flow above the tank temperature');
+    card.hass = hassOf({ ...states, ...toStates({ 'binary_sensor.daikin_warning': 'on' }) }, registry); await wait(5);
+    check(card.shadowRoot.getElementById('chip-err').classList.contains('on'), 'Daikin Onecta error and warning signals show the attention chip');
+    card.remove();
+    check(!detects('daikin_onecta', { 'sensor.daikin_flow': '35' },
+      { 'sensor.daikin_flow': { platform: 'other', translation_key: 'leavingwatertemperature' } }),
+    'Daikin Onecta does not detect another integration reusing its entity translation key');
+  }
+  {
     // #417: Aira 6 kW with ha-airahome, nigelm's entity ids and values while heating. Entities by translation key (platform airahome).
     const states = {}; const registry = {};
     const add = (id, tk, state, unit, attrs) => {
@@ -3796,7 +3858,7 @@
     check(o.samsung === 1 && o.ring === 0 && o.fans === 1 && o.ok, `Samsung preset draws the EHS Mono unit (${JSON.stringify(o)})`);
     // Automatic drawing per preset, as listed in the README table "Outdoor-unit style coverage" (#151). A new preset needs an entry here.
     const unitOf = { lambda: 'lambda', vicare: 'viessmann', open3e: 'viessmann', vaillant: 'vaillant', ebusd: 'vaillant', emsesp: 'bosch', bosch_buderus_heating: 'bosch',
-      heishamon: 'panasonic', samsung: 'samsung', wolf: 'wolf', kronoterm: 'kronoterm', luxtronik: 'alpha_innotec', stiebel_isg: 'stiebel', espaltherma: 'generic', ehs_sentinel: 'samsung', airahome: 'generic', nibe: 'generic' };
+      heishamon: 'panasonic', samsung: 'samsung', wolf: 'wolf', kronoterm: 'kronoterm', luxtronik: 'alpha_innotec', stiebel_isg: 'stiebel', espaltherma: 'generic', ehs_sentinel: 'samsung', airahome: 'generic', nibe: 'generic', daikin_onecta: 'generic' };
     const unitWrong = Object.keys(HFC_PRESETS).filter((p) => (HFC_PRESETS[p].unit_style || 'generic') !== unitOf[p]);
     check(!unitWrong.length, `every preset selects the outdoor-unit drawing the README lists (${unitWrong.join(', ') || 'all match'})`);
     check(Object.values(unitOf).every((s) => HFC_UNIT_STYLES.includes(s)), 'the expected drawings are valid unit_style values');

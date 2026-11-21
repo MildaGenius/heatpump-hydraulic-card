@@ -1,0 +1,38 @@
+{
+  "preset": "daikin_onecta",
+  "reviewed": {
+    "date": "2026-11-19",
+    "version": null,
+    "note": "Built from the Daikin Onecta integration source: entity translation keys, supported management-point sensors, climate mode and energy counter definitions."
+  },
+  "unmapped": {
+    "status": "No separate current operating-status entity is defined; the climate entity reports the selected HVAC mode.",
+    "defrost": "No dedicated defrost entity is defined.",
+    "volume": "No hydronic flow-rate entity is defined.",
+    "return": "No heat-pump return-temperature entity is defined.",
+    "source_volume": "No source-loop flow-rate entity is defined.",
+    "source_in": "No source-loop inlet temperature entity is defined.",
+    "source_out": "No source-loop outlet temperature entity is defined.",
+    "heater": "No backup-heater state or power entity is defined.",
+    "dhw_target": "No dedicated domestic-hot-water target entity is defined.",
+    "dhw_mode": "No dedicated domestic-hot-water charging mode is defined.",
+    "circulation": "No domestic-hot-water circulation-pump entity is defined.",
+    "dhw_heater": "No domestic-hot-water heater entity is defined.",
+    "buffer_top": "No buffer-temperature entity is defined.",
+    "energy_total": "Electrical consumption is exposed by heating/cooling and time period, not as a lifetime total.",
+    "heat_total": "Thermal output is exposed by heating/cooling and month/year, not as a lifetime total."
+  },
+  "sources": [
+    {
+      "repo": "jwillemsen/daikin_onecta",
+      "branch": "master",
+      "releases": false,
+      "paths": [
+        "custom_components/daikin_onecta/entity_descriptions.py",
+        "custom_components/daikin_onecta/sensor.py",
+        "custom_components/daikin_onecta/binary_sensor.py",
+        "custom_components/daikin_onecta/climate.py"
+      ]
+    }
+  ]
+}

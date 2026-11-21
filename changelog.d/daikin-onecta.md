@@ -1,0 +1,1 @@
+- Add a Daikin Onecta preset for Altherma water temperatures, room temperature, circuit flow, today's heating consumption, optional live COP, other energy counters, and diagnostic sensors.

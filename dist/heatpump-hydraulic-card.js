@@ -1588,6 +1588,7 @@ const HFC_PRESETS = {
   acond_integration: {
     name: 'Acond (Acond Integration)',
     tested: true,
+    primary_pump: true,
     auto_circuits: false,
     detect: (ctx) => {
       const id = ctx.match(/^binary_sensor\.(page49|acond_heat_pump)_compressor(?:_(\d+))?$/, 'acond_integration');
@@ -1601,12 +1602,16 @@ const HFC_PRESETS = {
       const b = (...names) => names.map((name) => stem === 'page49' ? `binary_sensor.page49_${name}${suffix}` : `binary_sensor.acond_heat_pump_${name}${suffix}`);
       return stem === 'page49' ? {
         compressor: b('compressor'),
+        primary_pump_state: b('circulation_pump'),
+        hc_pump: b('circulation_pump_output'),
         valve: b('dhw_heating'),
         outdoor: s('average_outdoor_temperature'),
         dhw_target: s('target_dhw_temperature'),
         room_target: s('desired_room_temperature'),
       } : {
         compressor: b('compressor'),
+        primary_pump_state: b('circulation_pump'),
+        hc_pump: b('circulation_pump_output'),
         fan_speed: b('fan'),
         flow: s('plate_heat_exchanger_water_temperature'),
         valve: b('domestic_hot_water_heating'),

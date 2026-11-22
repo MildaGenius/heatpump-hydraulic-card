@@ -213,6 +213,8 @@
     const r = C._resolve({ preset: 'acond_integration' }, hass); const e = r.entities;
     check(r.ready && e.compressor === 'binary_sensor.acond_heat_pump_compressor'
       && e.valve === 'binary_sensor.acond_heat_pump_domestic_hot_water_heating'
+      && e.primary_pump_state === 'binary_sensor.acond_heat_pump_circulation_pump'
+      && e.hc_pump === 'binary_sensor.acond_heat_pump_circulation_pump_output'
       && e.fan_speed === 'binary_sensor.acond_heat_pump_fan'
       && e.flow === 'sensor.acond_heat_pump_plate_heat_exchanger_water_temperature'
       && e.outdoor === 'sensor.acond_heat_pump_outdoor_temperature' && e.dhw_top === 'sensor.acond_heat_pump_hot_water_temperature'
@@ -227,24 +229,31 @@
     check(card.shadowRoot.getElementById('t-buf-target').textContent.includes('32.0'), 'Acond shows the requested buffer temperature separately from its measured temperature');
     check(card.shadowRoot.getElementById('t-vl').textContent.includes('36.0') && card.shadowRoot.getElementById('fan').classList.contains('on'),
       'Acond shows the plate-exchanger outlet as heat-pump flow and the documented outdoor fan state');
+    check(card._primaryPump() && card._pumpOn('primary_pump_state') && card._flowModel().circuits[0].pump,
+      'Acond heating runs the heat-pump primary pump and the system circulation pump');
     check(card._flowModel().running && card._flowModel().hp === 'heating', 'Acond compressor and hot-water flag show heating');
     card.hass = hassOf(toStates(setup.states('dhw')), registry); await wait(5);
-    check(card._flowModel().hp === 'dhw', 'Acond hot-water heating flag selects the DHW route');
+    check(card._flowModel().hp === 'dhw' && card._pumpOn('primary_pump_state') && !card._flowModel().circuits[0].pump,
+      'Acond DHW operation runs the heat-pump pump but stops the system circulation pump');
     card.hass = hassOf(toStates(setup.states('idle')), registry); await wait(5);
     check(!card._flowModel().running && card._flowModel().hp === 'idle', 'Acond stopped compressor shows idle');
     card.remove();
     const foreign = hassOf(toStates({ 'binary_sensor.page49_compressor': 'on' }),
       { 'binary_sensor.page49_compressor': { platform: 'other' } });
     check(!C._presetMatches(foreign).some((m) => m.name === 'acond_integration'), 'Acond entity IDs from another integration are not detected');
-    const catalog = hassOf(toStates({ 'binary_sensor.page49_compressor': 'on', 'binary_sensor.page49_dhw_heating': 'off',
+    const catalog = hassOf(toStates({ 'binary_sensor.page49_compressor': 'on', 'binary_sensor.page49_circulation_pump': 'on',
+      'binary_sensor.page49_circulation_pump_output': 'off', 'binary_sensor.page49_dhw_heating': 'off',
       'sensor.page49_average_outdoor_temperature': ['4.1', '°C'], 'sensor.page49_target_dhw_temperature': ['50', '°C'],
       'sensor.page49_desired_room_temperature': ['21', '°C'] }), Object.fromEntries([
-      'binary_sensor.page49_compressor', 'binary_sensor.page49_dhw_heating', 'sensor.page49_average_outdoor_temperature',
+      'binary_sensor.page49_compressor', 'binary_sensor.page49_circulation_pump', 'binary_sensor.page49_circulation_pump_output',
+      'binary_sensor.page49_dhw_heating', 'sensor.page49_average_outdoor_temperature',
       'sensor.page49_target_dhw_temperature', 'sensor.page49_desired_room_temperature',
     ].map((id) => [id, { platform: 'acond_integration' }])));
     const old = C._resolve({ preset: 'acond_integration' }, catalog);
-    check(old.ready && old.entities.compressor === 'binary_sensor.page49_compressor' && old.entities.valve === 'binary_sensor.page49_dhw_heating',
-      'Acond keeps supporting the catalog suggested IDs');
+    check(old.ready && old.entities.compressor === 'binary_sensor.page49_compressor'
+      && old.entities.primary_pump_state === 'binary_sensor.page49_circulation_pump'
+      && old.entities.hc_pump === 'binary_sensor.page49_circulation_pump_output'
+      && old.entities.valve === 'binary_sensor.page49_dhw_heating', 'Acond keeps supporting the catalog suggested IDs and pump roles');
   }
 
   // 5-00. Two integrations for one heat pump (#143): the preset with more live core entities wins, a tie keeps the order
@@ -5407,7 +5416,7 @@
     card = await mountSetup('Kronoterm ADAPT');
     check(!!q(card, 'circle.pump[cx="720"]'), 'Kronoterm: the loop pump stays in the circuit next to the primary pump');
     card.remove();
-    check(Object.entries(HFC_PRESETS).filter(([, p]) => p.primary_pump).map(([k]) => k).sort().join() === 'airahome,ehs_sentinel,espaltherma,heishamon,kronoterm,nibe,samsung', 'presets with a primary pump: Aira, EHS Sentinel, ESPAltherma, HeishaMon, Kronoterm, NIBE, Samsung');
+    check(Object.entries(HFC_PRESETS).filter(([, p]) => p.primary_pump).map(([k]) => k).sort().join() === 'acond_integration,airahome,ehs_sentinel,espaltherma,heishamon,kronoterm,nibe,samsung', 'presets with a primary pump: Acond, Aira, EHS Sentinel, ESPAltherma, HeishaMon, Kronoterm, NIBE, Samsung');
   }
 
   // 18p. hot-water standby loss (#32): cool-down in K/h only in verified standby windows, charging and draw-off excluded

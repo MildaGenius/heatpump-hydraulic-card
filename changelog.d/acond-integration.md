@@ -1,1 +1,1 @@
-- Add an Acond Integration preset for compressor, fan, heat-pump flow, hot-water routing, tank and buffer temperatures, requested buffer target, and room targets. Show an optional buffer target in the buffer tank.
+- Add an Acond Integration preset for compressor, primary and system circulation pumps, fan, heat-pump flow, hot-water routing, tank and buffer temperatures, requested buffer target, and room targets. Show an optional buffer target in the buffer tank.

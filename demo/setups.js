@@ -1043,6 +1043,8 @@ setups.push({
 
 const acondStates = (s) => ({
   'binary_sensor.acond_heat_pump_compressor': s === 'heat' || s === 'dhw' ? 'on' : 'off',
+  'binary_sensor.acond_heat_pump_circulation_pump': s === 'heat' || s === 'dhw' ? 'on' : 'off',
+  'binary_sensor.acond_heat_pump_circulation_pump_output': s === 'heat' ? 'on' : 'off',
   'binary_sensor.acond_heat_pump_fan': s === 'heat' || s === 'dhw' ? 'on' : 'off',
   'binary_sensor.acond_heat_pump_domestic_hot_water_heating': s === 'dhw' ? 'on' : 'off',
   'sensor.acond_heat_pump_plate_heat_exchanger_water_temperature': ['36.0', '°C'],

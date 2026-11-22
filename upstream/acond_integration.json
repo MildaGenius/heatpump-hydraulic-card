@@ -3,7 +3,7 @@
   "reviewed": {
     "date": "2026-11-21",
     "version": "1.0.0",
-    "note": "Built from the Acond Integration entity catalog, sensor and binary-sensor platforms, entity ID generation, and manifest; entity IDs cross-checked against one Home Assistant installation. The manual's P02 alarm entry identifies the plate-exchanger outlet temperature as flow, and its RCM2-1 symbols identify the outdoor fan; P01 system return has no distinct entity in the supplied entity list."
+    "note": "Built from the Acond Integration entity catalog, sensor and binary-sensor platforms, entity ID generation, and manifest; entity IDs cross-checked against one Home Assistant installation. The manual's P02 alarm entry identifies the plate-exchanger outlet temperature as flow, and its RCM2-1 symbols identify the outdoor fan and two circulation pumps. A Home Assistant observation during DHW and space heating maps circulation_pump to the heat-pump primary pump and circulation_pump_output to the system pump. P01 system return has no distinct entity in the supplied entity list."
   },
   "unmapped": {
     "return": "The manual identifies a system-return probe as P01, but the supplied HA entity list has no distinct entity for it.",
@@ -29,7 +29,10 @@
         "custom_components/acond_integration/api.py",
         "custom_components/acond_integration/binary_sensor.py",
         "custom_components/acond_integration/manifest.json",
-        "custom_components/acond_integration/sensor.py"
+        "custom_components/acond_integration/sensor.py",
+        "PageExamples/PAGE49.JS",
+        "PageExamples/PAGE49.xml",
+        "PageExamples/acond_logged_keys.json"
       ]
     }
   ]

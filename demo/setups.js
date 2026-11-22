@@ -1041,4 +1041,24 @@ setups.push({
   });
 });
 
+const acondStates = (s) => ({
+  'binary_sensor.acond_heat_pump_compressor': s === 'heat' || s === 'dhw' ? 'on' : 'off',
+  'binary_sensor.acond_heat_pump_fan': s === 'heat' || s === 'dhw' ? 'on' : 'off',
+  'binary_sensor.acond_heat_pump_domestic_hot_water_heating': s === 'dhw' ? 'on' : 'off',
+  'sensor.acond_heat_pump_plate_heat_exchanger_water_temperature': ['36.0', '°C'],
+  'sensor.acond_heat_pump_outdoor_temperature': ['4.1', '°C'],
+  'sensor.acond_heat_pump_hot_water_temperature': ['48.5', '°C'],
+  'sensor.acond_heat_pump_target_domestic_hot_water_temperature': ['50', '°C'],
+  'sensor.acond_heat_pump_buffer_temperature': ['34.0', '°C'],
+  'sensor.acond_heat_pump_requested_buffer_temperature': ['32.0', '°C'],
+  'sensor.acond_heat_pump_room_temperature': ['20.8', '°C'],
+  'sensor.acond_heat_pump_desired_room_temperature': ['21.0', '°C'],
+});
+setups.push({
+  name: 'Acond', sub: 'Acond Integration, entity IDs reported by a Home Assistant installation',
+  states: acondStates,
+  registry: regOf(acondStates, 'acond_integration'),
+  config: { preset: 'acond_integration', title: 'Acond' },
+});
+
 const scenarios = [['heat', 'Heating'], ['dhw', 'Hot water'], ['defrost', 'Defrost'], ['idle', 'Standby + error']];

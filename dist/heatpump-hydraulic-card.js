@@ -1583,6 +1583,45 @@ const HFC_PRESETS = {
     },
   },
 
+  // Acond heat pumps through the Acond Integration (acond_integration). Both the catalog IDs and the IDs seen in
+  // Home Assistant installations are supported; a numeric suffix handles duplicate entity IDs.
+  acond_integration: {
+    name: 'Acond (Acond Integration)',
+    tested: true,
+    auto_circuits: false,
+    detect: (ctx) => {
+      const id = ctx.match(/^binary_sensor\.(page49|acond_heat_pump)_compressor(?:_(\d+))?$/, 'acond_integration');
+      const m = id && id.match(/^binary_sensor\.(page49|acond_heat_pump)_compressor(?:_(\d+))?$/);
+      return m ? `${m[1]}${m[2] ? `_${m[2]}` : ''}` : undefined;
+    },
+    entities: (p) => {
+      const m = /^(page49|acond_heat_pump)(_\d+)?$/.exec(p);
+      const stem = m?.[1] || 'page49'; const suffix = m?.[2] || '';
+      const s = (...names) => names.map((name) => stem === 'page49' ? `sensor.page49_${name}${suffix}` : `sensor.acond_heat_pump_${name}${suffix}`);
+      const b = (...names) => names.map((name) => stem === 'page49' ? `binary_sensor.page49_${name}${suffix}` : `binary_sensor.acond_heat_pump_${name}${suffix}`);
+      return stem === 'page49' ? {
+        compressor: b('compressor'),
+        valve: b('dhw_heating'),
+        outdoor: s('average_outdoor_temperature'),
+        dhw_target: s('target_dhw_temperature'),
+        room_target: s('desired_room_temperature'),
+      } : {
+        compressor: b('compressor'),
+        fan_speed: b('fan'),
+        flow: s('plate_heat_exchanger_water_temperature'),
+        valve: b('domestic_hot_water_heating'),
+        outdoor: s('outdoor_temperature', 'average_outdoor_temperature'),
+        dhw_top: s('hot_water_temperature'),
+        dhw_target: s('target_domestic_hot_water_temperature'),
+        buffer_top: s('buffer_temperature'),
+        buffer_target: s('requested_buffer_temperature'),
+        room: s('room_temperature'),
+        room_target: s('desired_room_temperature'),
+      };
+    },
+    valve_map: { on: 'dhw', off: 'heating' },
+  },
+
   // Daikin Altherma / ROTEX through ESPAltherma (ESP32 on the X10A port, MQTT device discovery, beta branch, #254). Every value of
   // the model definition becomes <prefix>_<label>: the label lowercased, letters and digits only, spaces as underscores. The labels
   // stay English in every language and are the same in the Altherma 3, LT, EPRA, ERGA and EBLA definitions. The prefix is the
@@ -2139,7 +2178,7 @@ const HFC_EDITOR = {
     pv_boost: 'PV surplus mode (on, or a power above 0)',
     sg_ready: 'SG-Ready / utility lock state (1–4 or text)',
     dhw_top: 'DHW tank top (°C)', dhw_middle: 'DHW tank middle (°C)', dhw_bottom: 'DHW tank bottom (°C)', dhw_target: 'DHW target (°C)', dhw_mode: 'DHW mode (state text)',
-    circulation: 'Circulation pump running (on/off)', circulation_start: 'Circulation window starts', circulation_end: 'Circulation window ends', circulation_schedule: 'Circulation schedule (next change)', dhw_loss_sensor: 'DHW standby-loss measurement (°C)', buffer_top: 'Buffer top (°C)', buffer_middle: 'Buffer middle (°C)', buffer_bottom: 'Buffer bottom (°C)', buffer_mode: 'Buffer mode (state text)',
+    circulation: 'Circulation pump running (on/off)', circulation_start: 'Circulation window starts', circulation_end: 'Circulation window ends', circulation_schedule: 'Circulation schedule (next change)', dhw_loss_sensor: 'DHW standby-loss measurement (°C)', buffer_top: 'Buffer top (°C)', buffer_target: 'Buffer target (°C)', buffer_middle: 'Buffer middle (°C)', buffer_bottom: 'Buffer bottom (°C)', buffer_mode: 'Buffer mode (state text)',
     hc_flow: 'Circuit flow temperature (°C)', hc_return: 'Circuit return temperature (°C)', hc_setpoint: 'Circuit flow target (°C)',
     hc_mode: 'Circuit mode (state text)', hc_pump: 'Circuit pump running (on/off)', hc_volume: 'Flow rate of the heating circuit (l/h or l/min, circuit pump)', hc_curve_offset: 'Heating curve shift (K)', hc_mixer: 'Mixer position or share (%, shown as reported)', hc_mixer_opening: 'Mixer motor opening (on/off)', hc_mixer_closing: 'Mixer motor closing (on/off)', hc_pressure: 'Heating circuit pressure (bar)', brine_pressure: 'Brine circuit pressure (bar)',
     cutout_high_pressure: 'High-pressure cut-outs (count of events, not a pressure)', cutout_low_pressure: 'Low-pressure cut-outs (count of events, not a pressure)', cutout_temperature: 'Temperature cut-outs (count of events, not a temperature)',
@@ -2241,7 +2280,7 @@ const HFC_EDITOR = {
     pv_boost: 'PV-Überschussbetrieb (ein, oder Leistung über 0)',
     sg_ready: 'SG-Ready / EVU-Sperre (1–4 oder Text)',
     dhw_top: 'WW-Speicher oben (°C)', dhw_middle: 'WW-Speicher Mitte (°C)', dhw_bottom: 'WW-Speicher unten (°C)', dhw_target: 'WW-Soll (°C)', dhw_mode: 'WW-Betriebsart (Statustext)',
-    circulation: 'Zirkulationspumpe läuft (ein/aus)', circulation_start: 'Zirkulationsfenster beginnt', circulation_end: 'Zirkulationsfenster endet', circulation_schedule: 'Zirkulations-Zeitplan (nächster Wechsel)', dhw_loss_sensor: 'Messsensor WW-Standbyverlust (°C)', buffer_top: 'Puffer oben (°C)', buffer_middle: 'Puffer Mitte (°C)', buffer_bottom: 'Puffer unten (°C)', buffer_mode: 'Puffer-Betriebsart (Statustext)',
+    circulation: 'Zirkulationspumpe läuft (ein/aus)', circulation_start: 'Zirkulationsfenster beginnt', circulation_end: 'Zirkulationsfenster endet', circulation_schedule: 'Zirkulations-Zeitplan (nächster Wechsel)', dhw_loss_sensor: 'Messsensor WW-Standbyverlust (°C)', buffer_top: 'Puffer oben (°C)', buffer_target: 'Puffer-Solltemperatur (°C)', buffer_middle: 'Puffer Mitte (°C)', buffer_bottom: 'Puffer unten (°C)', buffer_mode: 'Puffer-Betriebsart (Statustext)',
     hc_flow: 'Heizkreis-Vorlauf (°C)', hc_return: 'Heizkreis-Rücklauf (°C)', hc_setpoint: 'Heizkreis-Vorlauf-Soll (°C)',
     hc_mode: 'Heizkreis-Betriebsart (Statustext)', hc_pump: 'Heizkreispumpe läuft (ein/aus)', hc_volume: 'Volumenstrom Heizkreis (l/h oder l/min, Heizkreispumpe)', hc_curve_offset: 'Heizkurven-Verschiebung (K)', hc_mixer: 'Mischer-Stellung oder -Anteil (%, wird angezeigt wie gemeldet)', hc_mixer_opening: 'Mischermotor öffnet (ein/aus)', hc_mixer_closing: 'Mischermotor schließt (ein/aus)', hc_pressure: 'Heizkreis-Druck (bar)', brine_pressure: 'Solekreis-Druck (bar)',
     cutout_high_pressure: 'Hochdruck-Abschaltungen (Anzahl der Ereignisse, kein Druck)', cutout_low_pressure: 'Niederdruck-Abschaltungen (Anzahl der Ereignisse, kein Druck)', cutout_temperature: 'Temperatur-Abschaltungen (Anzahl der Ereignisse, keine Temperatur)',
@@ -2318,7 +2357,7 @@ const HFC_EDITOR = {
     pv_boost: 'Tryb nadwyżki PV (włączony, lub moc powyżej 0)',
     sg_ready: 'SG-Ready / blokada taryfowa (1–4 lub tekst)',
     dhw_top: 'Zasobnik c.w.u. góra', dhw_middle: 'Zasobnik c.w.u. środek', dhw_bottom: 'Zasobnik c.w.u. dół', dhw_target: 'Temperatura docelowa c.w.u.', dhw_mode: 'Tryb c.w.u.',
-    circulation: 'Pompa cyrkulacyjna', circulation_start: 'Początek okna cyrkulacji', circulation_end: 'Koniec okna cyrkulacji', circulation_schedule: 'Harmonogram cyrkulacji (następna zmiana)', buffer_top: 'Bufor góra', buffer_middle: 'Bufor środek', buffer_bottom: 'Bufor dół', buffer_mode: 'Tryb bufora',
+    circulation: 'Pompa cyrkulacyjna', circulation_start: 'Początek okna cyrkulacji', circulation_end: 'Koniec okna cyrkulacji', circulation_schedule: 'Harmonogram cyrkulacji (następna zmiana)', buffer_top: 'Bufor góra', buffer_target: 'Temperatura zadana bufora', buffer_middle: 'Bufor środek', buffer_bottom: 'Bufor dół', buffer_mode: 'Tryb bufora',
     hc_flow: 'Temperatura zasilania obiegu', hc_return: 'Temperatura powrotu obiegu', hc_setpoint: 'Docelowa temperatura zasilania obiegu',
     hc_mode: 'Tryb obiegu', hc_pump: 'Pompa obiegowa działa (binarna)', hc_volume: 'Przepływ obiegu', hc_curve_offset: 'Przesunięcie krzywej grzewczej (K)', hc_pressure: 'Ciśnienie w obiegu grzewczym', brine_pressure: 'Ciśnienie w obiegu solanki',
     cutout_high_pressure: 'Wyłączenia wysokociśnieniowe (liczba zdarzeń, a nie ciśnienie)', cutout_low_pressure: 'Wyłączenia niskociśnieniowe (liczba zdarzeń, a nie ciśnienie)', cutout_temperature: 'Wyłączenia temperaturowe (liczba zdarzeń, a nie temperatura)',
@@ -2448,7 +2487,7 @@ const HFC_EDITOR = {
     pv_boost: 'Režim prebytku FVE (zapnuté, alebo výkon nad 0)',
     sg_ready: 'SG-Ready / blokovanie siete (1–4 alebo text)',
     dhw_top: 'Nádrž TÚV hore', dhw_middle: 'Nádrž TÚV v strede', dhw_bottom: 'Nádrž TÚV dole', dhw_target: 'Cieľová teplota TÚV', dhw_mode: 'Režim TÚV',
-    circulation: 'Cirkulačné čerpadlo', circulation_start: 'Začiatok okna cirkulácie', circulation_end: 'Koniec okna cirkulácie', circulation_schedule: 'Plán cirkulácie (ďalšia zmena)', buffer_top: 'Akumulačný zásobník hore', buffer_middle: 'Akumulačný zásobník v strede', buffer_bottom: 'Akumulačný zásobník dole', buffer_mode: 'Režim akumulačného zásobníka',
+    circulation: 'Cirkulačné čerpadlo', circulation_start: 'Začiatok okna cirkulácie', circulation_end: 'Koniec okna cirkulácie', circulation_schedule: 'Plán cirkulácie (ďalšia zmena)', buffer_top: 'Akumulačný zásobník hore', buffer_target: 'Cieľová teplota akumulačného zásobníka', buffer_middle: 'Akumulačný zásobník v strede', buffer_bottom: 'Akumulačný zásobník dole', buffer_mode: 'Režim akumulačného zásobníka',
     hc_flow: 'Teplota prívodu okruhu', hc_return: 'Teplota spiatočky okruhu', hc_setpoint: 'Cieľová teplota prívodu okruhu',
     hc_mode: 'Režim okruhu', hc_pump: 'Čerpadlo okruhu beží (binárne)', hc_volume: 'Prietok okruhu', hc_curve_offset: 'Posun vykurovacej krivky (K)', hc_pressure: 'Tlak vo vykurovacom okruhu', brine_pressure: 'Tlak v okruhu nemrznúcej zmesi',
     cutout_high_pressure: 'Vysokotlakové vypnutia (počet udalostí, nie tlak)', cutout_low_pressure: 'Nízkotlakové vypnutia (počet udalostí, nie tlak)', cutout_temperature: 'Teplotné vypnutia (počet udalostí, nie teplota)',
@@ -2578,7 +2617,7 @@ const HFC_EDITOR = {
     pv_boost: 'Režim přebytku FVE (zapnuto, nebo výkon nad 0)',
     sg_ready: 'SG-Ready / blokování sítě (1–4 nebo text)',
     dhw_top: 'Nádrž TUV nahoře', dhw_middle: 'Nádrž TUV uprostřed', dhw_bottom: 'Nádrž TUV dole', dhw_target: 'Cílová teplota TUV', dhw_mode: 'Režim TUV',
-    circulation: 'Cirkulační čerpadlo', circulation_start: 'Začátek okna cirkulace', circulation_end: 'Konec okna cirkulace', circulation_schedule: 'Plán cirkulace (další změna)', buffer_top: 'Akumulační zásobník nahoře', buffer_middle: 'Akumulační zásobník uprostřed', buffer_bottom: 'Akumulační zásobník dole', buffer_mode: 'Režim akumulačního zásobníku',
+    circulation: 'Cirkulační čerpadlo', circulation_start: 'Začátek okna cirkulace', circulation_end: 'Konec okna cirkulace', circulation_schedule: 'Plán cirkulace (další změna)', buffer_top: 'Akumulační zásobník nahoře', buffer_target: 'Cílová teplota akumulačního zásobníku', buffer_middle: 'Akumulační zásobník uprostřed', buffer_bottom: 'Akumulační zásobník dole', buffer_mode: 'Režim akumulačního zásobníku',
     hc_flow: 'Teplota přívodu okruhu', hc_return: 'Teplota zpátečky okruhu', hc_setpoint: 'Cílová teplota přívodu okruhu',
     hc_mode: 'Režim okruhu', hc_pump: 'Čerpadlo okruhu běží (binární)', hc_volume: 'Průtok okruhu', hc_curve_offset: 'Posun topné křivky (K)', hc_pressure: 'Tlak v topném okruhu', brine_pressure: 'Tlak v okruhu nemrznoucí směsi',
     cutout_high_pressure: 'Vysokotlaká vypnutí (počet událostí, nikoli tlak)', cutout_low_pressure: 'Nízkotlaká vypnutí (počet událostí, nikoli tlak)', cutout_temperature: 'Teplotní vypnutí (počet událostí, nikoli teplota)',
@@ -2718,7 +2757,7 @@ const HFC_EDITOR = {
     pv_boost: 'PV-overschotstand (aan, of een vermogen boven 0)',
     sg_ready: 'SG-Ready / netblokkering (1–4 of tekst)',
     dhw_top: 'Warmwatervat boven (°C)', dhw_middle: 'Warmwatervat midden (°C)', dhw_bottom: 'Warmwatervat onder (°C)', dhw_target: 'Warmwaterdoel (°C)', dhw_mode: 'Warmwaterstand (statustekst)',
-    circulation: 'Circulatiepomp actief (aan/uit)', circulation_start: 'Circulatievenster begint', circulation_end: 'Circulatievenster eindigt', circulation_schedule: 'Circulatieschema (volgende wissel)', dhw_loss_sensor: 'Meetsensor stilstandsverlies warm water (°C)', buffer_top: 'Buffervat boven (°C)', buffer_middle: 'Buffervat midden (°C)', buffer_bottom: 'Buffervat onder (°C)', buffer_mode: 'Bufferstand (statustekst)',
+    circulation: 'Circulatiepomp actief (aan/uit)', circulation_start: 'Circulatievenster begint', circulation_end: 'Circulatievenster eindigt', circulation_schedule: 'Circulatieschema (volgende wissel)', dhw_loss_sensor: 'Meetsensor stilstandsverlies warm water (°C)', buffer_top: 'Buffervat boven (°C)', buffer_target: 'Buffervatdoel (°C)', buffer_middle: 'Buffervat midden (°C)', buffer_bottom: 'Buffervat onder (°C)', buffer_mode: 'Bufferstand (statustekst)',
     hc_flow: 'Aanvoertemperatuur groep (°C)', hc_return: 'Retourtemperatuur groep (°C)', hc_setpoint: 'Aanvoerdoel groep (°C)',
     hc_mode: 'Stand groep (statustekst)', hc_pump: 'Groepspomp actief (aan/uit)', hc_volume: 'Debiet van de verwarmingsgroep (l/h of l/min, groepspomp)', hc_curve_offset: 'Verschuiving stooklijn (K)', hc_pressure: 'Druk verwarmingsgroep (bar)', brine_pressure: 'Druk broncircuit (bar)',
     cutout_high_pressure: 'Hogedrukuitschakelingen (aantal keer, geen druk)', cutout_low_pressure: 'Lagedrukuitschakelingen (aantal keer, geen druk)', cutout_temperature: 'Temperatuuruitschakelingen (aantal keer, geen temperatuur)',
@@ -2771,7 +2810,7 @@ const hfcCompressorOn = (s) => ['on', 'true', 'open', 'ein', 'running', 'startin
 const HFC_ENTITY_GROUPS = {
   sec_hp: ['mode', 'status', 'compressor', 'fan_speed', 'defrost', 'power', 'heat', 'flow', 'return', 'volume', 'primary_pump_state', 'source_volume', 'source_in', 'source_out', 'brine_pressure', 'outdoor', 'valve', 'heater', 'pv_boost', 'sg_ready'],
   sec_boiler: ['boiler_state', 'boiler_power', 'boiler_flow'],
-  sec_storage: ['dhw_top', 'dhw_middle', 'dhw_bottom', 'dhw_target', 'dhw_mode', 'circulation', 'circulation_start', 'circulation_end', 'circulation_schedule', 'dhw_loss_sensor', 'dhw_heater', 'dhw_heater_top', 'dhw_heater_middle', 'dhw_heater_bottom', 'buffer_top', 'buffer_middle', 'buffer_bottom', 'buffer_mode', 'buffer_heater', 'buffer_heater_top', 'buffer_heater_middle', 'buffer_heater_bottom', 'bypass_valve', 'solar_collector', 'solar_pump'],
+  sec_storage: ['dhw_top', 'dhw_middle', 'dhw_bottom', 'dhw_target', 'dhw_mode', 'circulation', 'circulation_start', 'circulation_end', 'circulation_schedule', 'dhw_loss_sensor', 'dhw_heater', 'dhw_heater_top', 'dhw_heater_middle', 'dhw_heater_bottom', 'buffer_top', 'buffer_target', 'buffer_middle', 'buffer_bottom', 'buffer_mode', 'buffer_heater', 'buffer_heater_top', 'buffer_heater_middle', 'buffer_heater_bottom', 'bypass_valve', 'solar_collector', 'solar_pump'],
   sec_hc: ['hc_flow', 'hc_return', 'hc_setpoint', 'hc_mode', 'hc_pump', 'hc_volume', 'hc_curve_offset', 'hc_mixer', 'hc_mixer_opening', 'hc_mixer_closing', 'hc_pressure', 'room', 'room_target', 'room_humidity', 'dew_point', 'program'],
   // The room of circuit 1 uses room/room_target; circuits 2 to 6 use their numbered keys in the shared house overview.
   sec_hc2: ['hc2_flow', 'hc2_return', 'hc2_setpoint', 'hc2_mode', 'hc2_pump', 'hc2_volume', 'hc2_curve_offset', 'hc2_mixer', 'hc2_mixer_opening', 'hc2_mixer_closing', 'hc2_room', 'hc2_room_target', 'hc2_room_humidity', 'hc2_dew_point'],
@@ -2825,7 +2864,7 @@ const HFC_KINDS = {
 };
 // Keys of circuits 2 to 6 use the kind of circuit 1 (hc2_flow → hc_flow, hc2_room → room); keys not listed are not checked.
 const HFC_KEY_KINDS = Object.fromEntries(Object.entries({
-  temperature: ['flow', 'return', 'source_in', 'source_out', 'outdoor', 'boiler_flow', 'dhw_top', 'dhw_middle', 'dhw_bottom', 'dhw_target', 'dhw_loss_sensor', 'buffer_top', 'buffer_middle',
+  temperature: ['flow', 'return', 'source_in', 'source_out', 'outdoor', 'boiler_flow', 'dhw_top', 'dhw_middle', 'dhw_bottom', 'dhw_target', 'dhw_loss_sensor', 'buffer_top', 'buffer_target', 'buffer_middle',
     'buffer_bottom', 'solar_collector', 'hc_flow', 'hc_return', 'hc_setpoint', 'room', 'room_target', 'dew_point', 'evap_temp', 'cond_temp', 'suction_temp', 'hot_gas', 'liquid_temp'],
   offset: ['hc_curve_offset', 'superheat', 'subcooling'],
   power: ['power', 'heat', 'boiler_power', 'pv', 'battery', 'grid'],
@@ -4941,6 +4980,7 @@ class HeatpumpFlowCard extends HTMLElement {
               ${P.combined ? `<text class="small zone-title on-tank" x="580" y="304" text-anchor="middle">${this._esc(i.heating_zone)}</text>`
     : `<text class="tank-title" x="${P.station ? 512 : 580}" y="310" text-anchor="${P.station ? 'end' : 'middle'}" data-fit="${P.station ? 84 : 128}">${this._esc(i.buffer)}</text>
               <rect class="tank" x="520" y="320" width="120" height="200" rx="26" fill="url(#g-buf)"/>`}
+              ${this._has('buffer_target') ? `<g class="tap" ${de('buffer_target')}><text class="small on-tank" id="t-buf-target" x="580" y="350" text-anchor="middle" data-fit="104"></text></g>` : ''}
               <text class="tank-temp${equalBuffer ? ' buffer-value' : ''}" id="t-buf-top" x="580" y="${bufferY.buffer_top ?? 392}" text-anchor="middle"></text>
               <text class="small" id="t-buf-mode" x="580" y="542" text-anchor="middle"></text>
             </g>
@@ -7780,6 +7820,8 @@ class HeatpumpFlowCard extends HTMLElement {
       this._$('g-buf-bottom').setAttribute('stop-color', this._tankColor(bot));
       // A combined storage or explicitly configured buffer may have no sensor in its heating zone: it stays neutral and empty.
       this._txt('t-buf-top', this._has('buffer_top') ? this._t(top) : '');
+      const bufferTarget = this._n('buffer_target');
+      this._txtPre('t-buf-target', i.target, this._has('buffer_target') && Number.isFinite(bufferTarget) ? this._t(bufferTarget) : '');
       this._txt('t-buf-middle', this._has('buffer_middle') ? this._t(this._n('buffer_middle')) : '');
       this._txt('t-buf-bottom', this._has('buffer_bottom') ? this._t(this._n('buffer_bottom')) : '');
       this._txt('t-buf-mode', this._has('buffer_mode') ? this._modeLabel(bufMode, this._s('buffer_mode')) : '');

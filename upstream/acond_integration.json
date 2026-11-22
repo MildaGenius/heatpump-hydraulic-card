@@ -1,0 +1,36 @@
+{
+  "preset": "acond_integration",
+  "reviewed": {
+    "date": "2026-11-21",
+    "version": "1.0.0",
+    "note": "Built from the Acond Integration entity catalog, sensor and binary-sensor platforms, entity ID generation, and manifest; entity IDs cross-checked against one Home Assistant installation. The manual's P02 alarm entry identifies the plate-exchanger outlet temperature as flow, and its RCM2-1 symbols identify the outdoor fan; P01 system return has no distinct entity in the supplied entity list."
+  },
+  "unmapped": {
+    "return": "The manual identifies a system-return probe as P01, but the supplied HA entity list has no distinct entity for it.",
+    "hc_flow": "The catalog does not identify a heating-circuit flow temperature.",
+    "hc_return": "The catalog does not identify a heating-circuit return temperature.",
+    "volume": "The catalog does not identify a water flow-rate entity.",
+    "power": "The integration does not define an identified electrical-power entity.",
+    "heat": "The integration does not define an identified heat-output entity.",
+    "defrost": "The catalog lists several defrost status flags but does not establish which one represents the unit's defrost state.",
+    "heater": "The catalog does not identify a backup-heater state.",
+    "circulation": "The catalog does not establish a domestic-hot-water circulation-pump role.",
+    "energy_total": "The integration does not define an identified lifetime electricity counter.",
+    "heat_total": "The integration does not define an identified lifetime heat counter.",
+    "starts_total": "The integration does not define an identified compressor-start counter."
+  },
+  "sources": [
+    {
+      "repo": "MildaGenius/HA_AcondIntegration",
+      "branch": "main",
+      "releases": true,
+      "paths": [
+        "custom_components/acond_integration/acond_logged_keys.json",
+        "custom_components/acond_integration/api.py",
+        "custom_components/acond_integration/binary_sensor.py",
+        "custom_components/acond_integration/manifest.json",
+        "custom_components/acond_integration/sensor.py"
+      ]
+    }
+  ]
+}

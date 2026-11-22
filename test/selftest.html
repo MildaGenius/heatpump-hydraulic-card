@@ -203,6 +203,50 @@
   check(HFC_PRESETS.vicare.tested === true && HFC_PRESETS.ebusd.tested === true, 'ViCare (#282) and ebusd (#295) presets are marked real-installation tested');
   check(HFC_PRESETS.espaltherma.tested === true, 'ESPAltherma preset is marked real-installation tested on an EPRA12EAV3 (#254)');
 
+  // Acond Integration: map the catalog IDs and the names reported by a real HA entity list.
+  {
+    check(HFC_PRESETS.acond_integration.tested === true, 'Acond preset is confirmed on a real Home Assistant installation');
+    const setup = setups.find((s) => s.config.preset === 'acond_integration');
+    const registry = setup.registry;
+    const hass = hassOf(toStates(setup.states('heat')), registry);
+    check(C.getStubConfig(hass).preset === 'acond_integration', 'Acond Integration is detected from its compressor');
+    const r = C._resolve({ preset: 'acond_integration' }, hass); const e = r.entities;
+    check(r.ready && e.compressor === 'binary_sensor.acond_heat_pump_compressor'
+      && e.valve === 'binary_sensor.acond_heat_pump_domestic_hot_water_heating'
+      && e.fan_speed === 'binary_sensor.acond_heat_pump_fan'
+      && e.flow === 'sensor.acond_heat_pump_plate_heat_exchanger_water_temperature'
+      && e.outdoor === 'sensor.acond_heat_pump_outdoor_temperature' && e.dhw_top === 'sensor.acond_heat_pump_hot_water_temperature'
+      && e.dhw_target === 'sensor.acond_heat_pump_target_domestic_hot_water_temperature'
+      && e.buffer_top === 'sensor.acond_heat_pump_buffer_temperature'
+      && e.buffer_target === 'sensor.acond_heat_pump_requested_buffer_temperature' && e.room === 'sensor.acond_heat_pump_room_temperature'
+      && e.room_target === 'sensor.acond_heat_pump_desired_room_temperature',
+    `Acond maps the compressor, DHW route, temperatures and targets (${e.compressor} / ${e.valve})`);
+    check(!e.return && !e.power && !e.heat,
+      'Acond leaves return, power and heat output unmapped when the manual or entity catalog does not identify them');
+    const card = mount({ preset: 'acond_integration' }, hass); await wait(20);
+    check(card.shadowRoot.getElementById('t-buf-target').textContent.includes('32.0'), 'Acond shows the requested buffer temperature separately from its measured temperature');
+    check(card.shadowRoot.getElementById('t-vl').textContent.includes('36.0') && card.shadowRoot.getElementById('fan').classList.contains('on'),
+      'Acond shows the plate-exchanger outlet as heat-pump flow and the documented outdoor fan state');
+    check(card._flowModel().running && card._flowModel().hp === 'heating', 'Acond compressor and hot-water flag show heating');
+    card.hass = hassOf(toStates(setup.states('dhw')), registry); await wait(5);
+    check(card._flowModel().hp === 'dhw', 'Acond hot-water heating flag selects the DHW route');
+    card.hass = hassOf(toStates(setup.states('idle')), registry); await wait(5);
+    check(!card._flowModel().running && card._flowModel().hp === 'idle', 'Acond stopped compressor shows idle');
+    card.remove();
+    const foreign = hassOf(toStates({ 'binary_sensor.page49_compressor': 'on' }),
+      { 'binary_sensor.page49_compressor': { platform: 'other' } });
+    check(!C._presetMatches(foreign).some((m) => m.name === 'acond_integration'), 'Acond entity IDs from another integration are not detected');
+    const catalog = hassOf(toStates({ 'binary_sensor.page49_compressor': 'on', 'binary_sensor.page49_dhw_heating': 'off',
+      'sensor.page49_average_outdoor_temperature': ['4.1', '°C'], 'sensor.page49_target_dhw_temperature': ['50', '°C'],
+      'sensor.page49_desired_room_temperature': ['21', '°C'] }), Object.fromEntries([
+      'binary_sensor.page49_compressor', 'binary_sensor.page49_dhw_heating', 'sensor.page49_average_outdoor_temperature',
+      'sensor.page49_target_dhw_temperature', 'sensor.page49_desired_room_temperature',
+    ].map((id) => [id, { platform: 'acond_integration' }])));
+    const old = C._resolve({ preset: 'acond_integration' }, catalog);
+    check(old.ready && old.entities.compressor === 'binary_sensor.page49_compressor' && old.entities.valve === 'binary_sensor.page49_dhw_heating',
+      'Acond keeps supporting the catalog suggested IDs');
+  }
+
   // 5-00. Two integrations for one heat pump (#143): the preset with more live core entities wins, a tie keeps the order
   {
     const vaillant = setups.find((s) => s.config.preset === 'vaillant'); const ebusd = setups.find((s) => s.config.preset === 'ebusd');
@@ -3859,6 +3903,7 @@
     // Automatic drawing per preset, as listed in the README table "Outdoor-unit style coverage" (#151). A new preset needs an entry here.
     const unitOf = { lambda: 'lambda', vicare: 'viessmann', open3e: 'viessmann', vaillant: 'vaillant', ebusd: 'vaillant', emsesp: 'bosch', bosch_buderus_heating: 'bosch',
       heishamon: 'panasonic', samsung: 'samsung', wolf: 'wolf', kronoterm: 'kronoterm', luxtronik: 'alpha_innotec', stiebel_isg: 'stiebel', espaltherma: 'generic', ehs_sentinel: 'samsung', airahome: 'generic', nibe: 'generic', daikin_onecta: 'generic' };
+    unitOf.acond_integration = 'generic';
     const unitWrong = Object.keys(HFC_PRESETS).filter((p) => (HFC_PRESETS[p].unit_style || 'generic') !== unitOf[p]);
     check(!unitWrong.length, `every preset selects the outdoor-unit drawing the README lists (${unitWrong.join(', ') || 'all match'})`);
     check(Object.values(unitOf).every((s) => HFC_UNIT_STYLES.includes(s)), 'the expected drawings are valid unit_style values');
